@@ -41,12 +41,26 @@ class laplace2DSolver():
     n = None    # intervals
 
     def __init__(self, p = 3):
-        """ """
+        """For computational reason, the grid is square and its size
+        is always a power of two. p is the power value and n the grid
+        size. Both masks are the same size as the data array. An extra
+        layer of zeroes is added at the edge of the square arrays for
+        ."""
+
+        # debug
         print(f"Run Laplace 2D Solver")
 
         # set resolution
         self.p = p
         self.n = 2**p
+
+        """ The intial set of data is now set a zero. As it turns out
+        empirically, a set of random numbers might converge slightly
+        faster towards the solution. However, the factor by which the
+        convergence is increased is on the order of one. This is not
+        a major increse in convergence speed. """
+        # set default data (zeros)
+        self.D = full([self.n+2]*2, ZER, DATATYPE) # data
 
         # set default masks (transparent)
         self.C = full([self.n+2]*2, MAX, DATATYPE) # mask clear 
@@ -58,23 +72,6 @@ class laplace2DSolver():
         # done
         return
 
-    def __del__(self):
-        """ """
-        print(f"Done")
-        return
-
-    def init(self):
-        """ The intial set of data is now set a zero. As it turns out
-        empirically, a set of random numbers might converge slightly
-        faster towards the solution. However, the factor by which the
-        convergence is increased is on the order of one. This is not
-        a major increse in convergence speed. """
-        # set default data (zeros)
-        self.D = full([self.n+2]*2, ZER, DATATYPE) # data
-        # set boundaries (at this stage the masks might still be transparent)
-        self.applyMasks()
-        # done
-        return
 
     def applyMasks(self):
         """ the re-set of the boundary conditions is reduced to two
