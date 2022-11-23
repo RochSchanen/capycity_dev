@@ -176,9 +176,6 @@ l = laplace2DSolver(7)
 
 if SOLVE:
 
-    # reserve memory    
-    l.init()
-
     # create disk
     D1 = Disk(0.15)
     M = D1.getMask(l.D)
@@ -190,7 +187,7 @@ if SOLVE:
     l.mergeCMask(M)
 
     # compute
-    for i in range(10000):
+    for i in range(1000):
           l.jacobiStep()
 
     # update data after solving
@@ -202,5 +199,5 @@ if DISPLAY:
 
     # export graphs
     p = PdfPages("results.pdf")
-    l.plotPotentialContourf(n = 50, pdfdoc = p)
+    l.plotPotentialContourf(n = 20, pdfdoc = p)
     p.close()
