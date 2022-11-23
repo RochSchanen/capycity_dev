@@ -26,8 +26,8 @@ to be the minimum required to provide a reliable solution. (This is
 higher than I personaly expected. I thought uint16 would be largely
 sufficient but it is not...). For development purposes, using 8 bits
 is a good ideas when checking operations on arrays. just uncomment the
-line next for this purpose """
-from numpy import uint8 as DATATYPE
+line next to use 8 bits range data type """
+# from numpy import uint8 as DATATYPE
 
 # define ZER and MAX values
 ZER, MAX = array([0, -1], DATATYPE)
@@ -105,6 +105,15 @@ class laplace2DSolver():
         # done
         return
 
+    def jacobiSteps(self, n):
+
+        # n jacobiStep iterations
+        for i in range(n):
+            self.jacobiStep()
+
+        # done
+        return
+
     def jacobiStep(self):
         """ operations a performed directly on arrays
         which should reduces the time of execution.
@@ -162,7 +171,10 @@ class laplace2DSolver():
 
     def incrementResolution(self):
         
-        """ increase the resolution by a factor two. """
+        """ increase the resolution by a factor two. One can notice that
+        with large resolution, the jacobi iteration "propagates" the potential
+        "wave" at a slower "velocity". At lower resolutions the convergence 
+        to a solution is quicker. In order to benefit from that fact, an  """
 
         # set new resolution
         self.p += 1
@@ -243,43 +255,53 @@ class laplace2DSolver():
 
 from capycity.geometry import Disk
 
-SETUP, SOLVE, DISPLAY = 1, 1, 0
+p = PdfPages("results.pdf")
 
 # instanciate solver
 l = laplace2DSolver(3)
+l.mergeMask(Disk(0.20), "S") # MAX
+l.mergeMask(Disk(0.40), "C") # ZER
+l.applyMasks()
 
-if SETUP:
+# l.plotPotentialDistribution(n = 30, pdfdoc = p) # 8
 
-    l.mergeMask(Disk(0.20), "S") # MAX
-    l.mergeMask(Disk(0.40), "C") # ZER
+l.jacobiSteps(10)
+l.plotPotentialDistribution(n = 30, pdfdoc = p) # 8
 
-if SOLVE:
+l.incrementResolution()
+l.jacobiSteps(20)
+l.plotPotentialDistribution(n = 30, pdfdoc = p) # 16
 
-    # compute
-    print(l.D)
-    print()
+l.incrementResolution()
+l.jacobiSteps(40)
+l.plotPotentialDistribution(n = 30, pdfdoc = p) # 32
 
-    l.jacobiStep()
-    print(l.D)
-    print()
+l.incrementResolution()
+l.jacobiSteps(80)
+l.plotPotentialDistribution(n = 30, pdfdoc = p) # 64
 
-    l.incrementResolution()
-    print(l.D)
-    print()
+l.incrementResolution()
+l.jacobiSteps(160)
+l.plotPotentialDistribution(n = 30, pdfdoc = p) # 128
 
-    for i in range(23):
-        l.jacobiStep()
-    print(l.D)
-    print()
+l.incrementResolution()
+l.jacobiSteps(320)
+l.plotPotentialDistribution(n = 30, pdfdoc = p) # 256
 
-    # update data after solving
-    # save(f"potential.npy", l.D)
+print(320+160+80+40+20+10)
 
-if DISPLAY:
+# instanciate another solver
+m = laplace2DSolver(8)
+m.mergeMask(Disk(0.20), "S") # MAX
+m.mergeMask(Disk(0.40), "C") # ZER
+m.applyMasks()
 
-    l.D = load(f"potential.npy")
+m.jacobiSteps(6000)
+m.plotPotentialDistribution(n = 30, pdfdoc = p) # 256
 
-    # export graphs
-    p = PdfPages("results.pdf")
-    l.plotPotentialDistribution(n = 50, pdfdoc = p)
-    p.close()
+print(6000)
+
+p.close()
+
+# update data after solving
+# save(f"potential.npy", l.D)
