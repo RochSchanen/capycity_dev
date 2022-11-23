@@ -11,7 +11,7 @@ from numpy import empty
 from numpy import shape
 from numpy import square
 
-class Disk():
+class _geometry():
 
     def __init__(self, *args, **kwargs):
         # call user init
@@ -19,7 +19,7 @@ class Disk():
         # done
         return
 
-    def getMask(self, D):
+    def mask(self, D):
         # get array size
         n, n = shape(D)
         # get array type
@@ -46,13 +46,26 @@ class Disk():
         # done
         return M
 
+    def init(self):
+        pass
+
+    def decor(self):
+        pass
+
+#####################################################################
+###                            DISK                              ####
+#####################################################################
+
+class Disk(_geometry):
+
     def init(self, r):
-        self.r = square(r)
+        self.r = r
+        self.R = square(r)
         return
 
     def discr(self, x, y):
-        t = square(x) + square(y)
-        return (t < self.r)
+        T = square(x) + square(y)
+        return (T < self.R)
 
     def decor(self):
         """the decor created is only applied
