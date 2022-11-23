@@ -206,13 +206,13 @@ l.mergeMask(Disk(0.40), "C") # SHELL 0.8 diameter
 
 # apply boundaries and display
 l.applyMasks()
-plotCrossSection(l, "k.-", pdfdoc = p)
+plotCrossSection(l, "k.-")
 # plotPotentialContourFill(l, n = 30, pdfdoc = p)
 
 # run jacobi steps and display
 # l.jacobiSteps(700)
 l.jacobiSteps(50) # 8 X 8
-plotCrossSection(l, "k.-", pdfdoc = p)
+plotCrossSection(l, "b.-", pdfdoc = p)
 # plotPotentialContourFill(l, n = 30, pdfdoc = p)
 
 p.close()

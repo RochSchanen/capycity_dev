@@ -27,7 +27,7 @@ def plotPotentialContourFill(solver, n = 30, *args, pdfdoc = None, **kwargs):
     plot_ticks, contour_ticks = 0.1, 0.1
 
     # create figure
-    fg = pp.figure()
+    fg = pp.figure("Contour")
     
     # set A4 paper dimensions
     fg.set_size_inches(8.2677, 11.6929)
@@ -80,39 +80,61 @@ def plotCrossSection(solver, *args, pdfdoc = None, **kwargs):
     # some parameters
     plot_ticks = 0.1
 
-    # create figure
-    fg = pp.figure()
+    if not pp.fignum_exists("Cross Section"):
 
-    # set A4 paper dimensions
-    fg.set_size_inches(8.2677, 11.6929)
+        # create figure
+        fg = pp.figure("Cross Section")
 
-    # create title
-    fg.suptitle(f"Potential Cross Section")
+        # set A4 paper dimensions
+        fg.set_size_inches(8.2677, 11.6929)
 
-    # create axis
-    w, h = array([1, 1 / 1.4143])*0.7
-    x, y = (1-w)/2, (1-h)/2
-    ax = fg.add_axes([x, y, w, h])
+        # create title
+        fg.suptitle(f"Potential Cross Section")
 
-    # x-coordinates
-    d = solver.l/(solver.n-1)
-    l = d*(solver.n-1)/2
-    X = arange(-l, l+d, d)
+        # create axis
+        w, h = array([1, 1 / 1.4143])*0.7
+        x, y = (1-w)/2, (1-h)/2
+        ax = fg.add_axes([x, y, w, h])
 
-    # y-coordinates
-    i = int(solver.n // 2 + 1)
-    Y = solver.D[i, 1:-1] / MAX
+        # x-coordinates
+        d = solver.l/(solver.n-1)
+        l = d*(solver.n-1)/2
+        X = arange(-l, l+d, d)
 
-    # make contour plot
-    pl = ax.plot(X, Y, *args, **kwargs)
+        # y-coordinates
+        i = int(solver.n // 2 + 1)
+        Y = solver.D[i, 1:-1] / MAX
 
-    # adjust ticks
-    ax.set_xticks(list(arange(-0.5, 0.5 + plot_ticks, plot_ticks)))
-    ax.set_yticks(list(arange(0.0, 1.0 + plot_ticks, plot_ticks)))
+        # make contour plot
+        pl = ax.plot(X, Y, *args, **kwargs)
 
-    # add decors
-    for g in solver.G:
-        ax.add_artist(g.section_decor())
+        # adjust ticks
+        ax.set_xticks(list(arange(-0.5, 0.5 + plot_ticks, plot_ticks)))
+        ax.set_yticks(list(arange(0.0, 1.0 + plot_ticks, plot_ticks)))
+
+        # add decors
+        for g in solver.G:
+            ax.add_artist(g.section_decor())
+
+    else:
+
+        # select figure
+        fg = pp.figure("Cross Section")
+
+        # select axes
+        ax = fg.get_axes()[0]
+
+        # x-coordinates
+        d = solver.l/(solver.n-1)
+        l = d*(solver.n-1)/2
+        X = arange(-l, l+d, d)
+
+        # y-coordinates
+        i = int(solver.n // 2 + 1)
+        Y = solver.D[i, 1:-1] / MAX
+
+        # make contour plot
+        pl = ax.plot(X, Y, *args, **kwargs)
 
     # export figure to pdf
     if pdfdoc: pdfdoc.savefig(fg)
