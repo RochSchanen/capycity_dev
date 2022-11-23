@@ -4,6 +4,7 @@
 
 # from package: "https://matplotlib.org/"
 from matplotlib.pyplot import Circle
+from matplotlib.pyplot import vlines
 
 # from package: "https://numpy.org/"
 from numpy import array
@@ -67,10 +68,10 @@ class Disk(_geometry):
         T = square(x) + square(y)
         return (T < self.R)
 
-    def decor(self):
-        """the decor created is only applied
-        on the current figure. It must be applied
-        on each figure that uses the decor"""
+    """ decorS created are only applied on the current figure. It must
+    be applied on each figure that uses the decor """
+
+    def contour_decor(self):
         
         # build decor
         c = Circle(
@@ -83,3 +84,15 @@ class Disk(_geometry):
         
         # done
         return c
+
+    def section_decor(self):
+
+        l = vlines(
+            [-self.r, +self.r],             # horizontal positions
+            0.0, 1.0,                       # vertical span
+            edgecolor = (0.7, 0.7, 0.7),    # color
+            linestyle = "--",               # line style
+            )
+
+        # done
+        return l

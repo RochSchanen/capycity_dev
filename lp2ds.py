@@ -15,26 +15,7 @@ from numpy import square
 # from numpy import save
 # from numpy import load
 
-# define data type
-from numpy import uint32 as DATATYPE
-""" the precision does not influence the error when storing the data.
-the idea that the result precision is 1/256 for the uint8 data type
-turns out to be naive. Even when the number of iteration has defintely
-passed the test of stability for a laplace solution. The final result
-can still be largely influenced by the integer precision. This can
-easily be checked empirically. As it turns out, a size of 32 bits seems
-to be the minimum required to provide a reliable solution. (This is
-higher than I personaly expected. I thought uint16 would be largely
-sufficient but it is not...). For development purposes, using 8 bits
-is a good ideas when checking operations on arrays. just uncomment the
-line next to use 8 bits range data type """
-# from numpy import uint8 as DATATYPE
-
-# define ZER and MAX values
-ZER, MAX = array([0, -1], DATATYPE)
-""" ZER is always represented by a chain of "zero" bits.
-MAX is always represented by a chain of "one" bits.
-The size of the chain depends on the integer size. """
+from capycity.config import DATATYPE, ZER, MAX
 
 class laplace2DSolver():
 
@@ -213,21 +194,25 @@ class laplace2DSolver():
 
 from capycity.geometry import Disk
 from capycity.graphics import plotPotentialContourFill
+from capycity.graphics import plotCrossSection
 
 p = PdfPages("results.pdf")
 
 # instanciate solver
-l = laplace2DSolver(6) # 128 X 128
+l = laplace2DSolver(3) # 128 X 128
 
 l.mergeMask(Disk(0.10), "S") # CENTER 0.2 diameter
 l.mergeMask(Disk(0.40), "C") # SHELL 0.8 diameter 
 
 # apply boundaries and display
 l.applyMasks()
-plotPotentialContourFill(l, n = 30, pdfdoc = p)
+plotCrossSection(l, "k.-", pdfdoc = p)
+# plotPotentialContourFill(l, n = 30, pdfdoc = p)
 
 # run jacobi steps and display
-l.jacobiSteps(700)
-plotPotentialContourFill(l, n = 30, pdfdoc = p)
+# l.jacobiSteps(700)
+l.jacobiSteps(50) # 8 X 8
+plotCrossSection(l, "k.-", pdfdoc = p)
+# plotPotentialContourFill(l, n = 30, pdfdoc = p)
 
 p.close()
