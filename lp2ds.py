@@ -199,20 +199,49 @@ from capycity.graphics import plotCrossSection
 p = PdfPages("results.pdf")
 
 # instanciate solver
-l = laplace2DSolver(3) # 128 X 128
+l = laplace2DSolver(3) # 8 X 8
 
 l.mergeMask(Disk(0.10), "S") # CENTER 0.2 diameter
 l.mergeMask(Disk(0.40), "C") # SHELL 0.8 diameter 
 
 # apply boundaries and display
 l.applyMasks()
-plotCrossSection(l, "k.-")
-# plotPotentialContourFill(l, n = 30, pdfdoc = p)
+# plotCrossSection(l, "k--")
 
 # run jacobi steps and display
-# l.jacobiSteps(700)
-l.jacobiSteps(50) # 8 X 8
-plotCrossSection(l, "b.-", pdfdoc = p)
-# plotPotentialContourFill(l, n = 30, pdfdoc = p)
+l.jacobiSteps(100) # 8 X 8
+# plotCrossSection(l, "r.-")
+
+l.incrementResolution()
+l.jacobiSteps(100) # 16 X 16
+# plotCrossSection(l, "r.-")
+
+l.incrementResolution()
+l.jacobiSteps(100) # 32 X 32
+# plotCrossSection(l, "r.-")
+
+l.incrementResolution()
+l.jacobiSteps(100) # 64 X 64
+# plotCrossSection(l, "r.-")
+
+l.incrementResolution()
+l.jacobiSteps(100) # 128 X 128
+# plotCrossSection(l, "r.-")
+
+l.incrementResolution()
+l.jacobiSteps(1000) # 256 X 256
+plotCrossSection(l, "k-.", pdfdoc = p)
+
+# instanciate solver
+# m = laplace2DSolver(8) # 256 X 256
+
+# m.mergeMask(Disk(0.10), "S") # CENTER 0.2 diameter
+# m.mergeMask(Disk(0.40), "C") # SHELL 0.8 diameter 
+
+# m.jacobiSteps(15000) # 256 X 256
+# plotCrossSection(m, "g-", pdfdoc = p)
 
 p.close()
+
+# to do: add the analytical solution to compare convergences.
+
