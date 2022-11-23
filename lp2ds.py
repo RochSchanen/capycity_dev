@@ -11,8 +11,9 @@ from numpy import array
 from numpy import copy
 from numpy import empty
 from numpy import square
-from numpy import save
-from numpy import load
+
+# from numpy import save
+# from numpy import load
 
 # define data type
 from numpy import uint32 as DATATYPE
@@ -170,82 +171,39 @@ class laplace2DSolver():
         return
 
     def incrementResolution(self):
-        
         """ increase the resolution by a factor two. One can notice that
         with large resolution, the jacobi iteration "propagates" the potential
         "wave" at a slower "velocity". At lower resolutions the convergence 
         to a solution is quicker. In order to benefit from that fact, an  """
 
-        # set new resolution
+        # update new resolution
         self.p += 1
         self.n = 2**self.p
 
         # save current data for the upgrade
         D = copy(self.D[1:-1, 1:-1])
-        """ edges are ingnored. """
+        """ ignore edges. """
 
         # reserve memory for the new data set
         self.D = full([self.n+2]*2, ZER, DATATYPE)
-        """ the new data set is initialised to ZER. This is used to
-        clear the data set edges. The rest of the array is overidden
-        during the "quadruplication" performed next. """
+        """ the new data set is initialised to zeros.
+        This is clearing up the edges. The rest of the
+        array is defined during the "quadruplication """
 
         # quadruplicate the data set
         self.D[1:-1:2, 1:-1:2] = D
         self.D[2:-1:2, 1:-1:2] = D
         self.D[1:-1:2, 2:-1:2] = D
         self.D[2:-1:2, 2:-1:2] = D
-        """ the initial increase """
 
-        # reset default masks (transparent)
+        # re-build masks
         self.C = full([self.n+2]*2, MAX, DATATYPE) # clear mask
         self.S = full([self.n+2]*2, ZER, DATATYPE) # set mask
-
-        # merge masks
         for g, t in zip(self.G, self.T):
-            # merge according to type
             {   "C": self._mergeClrMask,
                 "S": self._mergeSetMask,
             }[t](g.mask(self.D))
 
-        # done
-        return
-
-    def plotPotentialDistribution(self, n = 30, pdfdoc = None):
-        """  """
-        # some parameters
-        plot_ticks, contour_ticks = 0.1, 0.1
-        # create figure
-        fg = pp.figure()
-        # set A4 paper dimensions
-        fg.set_size_inches(8.2677, 11.6929)
-        # create title
-        fg.suptitle(f"Potential Distribution")
-        # create axis
-        w, h, k = [*list(array([1, 1 / 1.4143])*0.7), 0.03]
-        x, y = (1-w-k)/3, (1-h)/2
-        ax = fg.add_axes([x, y, w, h]) 
-        # x-coordinates
-        d = self.l/(self.n-1)
-        l = d*(self.n-1)/2
-        X = arange(-l, l+d, d)
-        # y-coordinates
-        Y = self.D[1:-1, 1:-1] / MAX
-        # make contour plot
-        c = [pp.cm.inferno, pp.cm.terrain][0]
-        args = {"cmap":c, "vmin":0.0, "vmax":1.0}
-        pl = ax.contourf(X, X, Y, n, **args)
-        # adjust ticks
-        ax.set_xticks(list(arange(-0.5, 0.5 + plot_ticks, plot_ticks)))
-        ax.set_yticks(list(arange(-0.5, 0.5 + plot_ticks, plot_ticks)))
-        # add decors
-        for g in self.G: ax.add_artist(g.decor())
-        # add new axis and color bar 
-        ax = fg.add_axes([x + w + x, y, k, h])
-        cb = fg.colorbar(pl, cax = ax)
-        cb.set_ticks(list(arange(0, 1 + contour_ticks, contour_ticks)))
-        # export figure to pdf
-        if pdfdoc: pdfdoc.savefig(fg)
         # done
         return
 
@@ -254,54 +212,22 @@ class laplace2DSolver():
 #####################################################################
 
 from capycity.geometry import Disk
+from capycity.graphics import plotPotentialContourFill
 
 p = PdfPages("results.pdf")
 
 # instanciate solver
-l = laplace2DSolver(3)
-l.mergeMask(Disk(0.20), "S") # MAX
-l.mergeMask(Disk(0.40), "C") # ZER
+l = laplace2DSolver(6) # 128 X 128
+
+l.mergeMask(Disk(0.10), "S") # CENTER 0.2 diameter
+l.mergeMask(Disk(0.40), "C") # SHELL 0.8 diameter 
+
+# apply boundaries and display
 l.applyMasks()
+plotPotentialContourFill(l, n = 30, pdfdoc = p)
 
-# l.plotPotentialDistribution(n = 30, pdfdoc = p) # 8
-
-l.jacobiSteps(10)
-l.plotPotentialDistribution(n = 30, pdfdoc = p) # 8
-
-l.incrementResolution()
-l.jacobiSteps(20)
-l.plotPotentialDistribution(n = 30, pdfdoc = p) # 16
-
-l.incrementResolution()
-l.jacobiSteps(40)
-l.plotPotentialDistribution(n = 30, pdfdoc = p) # 32
-
-l.incrementResolution()
-l.jacobiSteps(80)
-l.plotPotentialDistribution(n = 30, pdfdoc = p) # 64
-
-l.incrementResolution()
-l.jacobiSteps(160)
-l.plotPotentialDistribution(n = 30, pdfdoc = p) # 128
-
-l.incrementResolution()
-l.jacobiSteps(320)
-l.plotPotentialDistribution(n = 30, pdfdoc = p) # 256
-
-print(320+160+80+40+20+10)
-
-# instanciate another solver
-m = laplace2DSolver(8)
-m.mergeMask(Disk(0.20), "S") # MAX
-m.mergeMask(Disk(0.40), "C") # ZER
-m.applyMasks()
-
-m.jacobiSteps(6000)
-m.plotPotentialDistribution(n = 30, pdfdoc = p) # 256
-
-print(6000)
+# run jacobi steps and display
+l.jacobiSteps(700)
+plotPotentialContourFill(l, n = 30, pdfdoc = p)
 
 p.close()
-
-# update data after solving
-# save(f"potential.npy", l.D)
