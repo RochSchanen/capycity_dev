@@ -24,7 +24,10 @@ can still be largely influenced by the integer precision. This can
 easily be checked empirically. As it turns out, a size of 32 bits seems
 to be the minimum required to provide a reliable solution. (This is
 higher than I personaly expected. I thought uint16 would be largely
-sufficient but it is not...) """
+sufficient but it is not...). For development purposes, using 8 bits
+is a good ideas when checking operations on arrays. just uncomment the
+line next for this purpose """
+from numpy import uint8 as DATATYPE
 
 # define ZER and MAX values
 ZER, MAX = array([0, -1], DATATYPE)
@@ -40,7 +43,8 @@ class laplace2DSolver():
     n = None    # number of intervals
     l = None    # physical length
 
-    G = []      # geometries
+    G = []      # mask geometries
+    T = []      # mask types
 
     def __init__(self, p = 3):
         """ For computational reason, the grid is square and its size
@@ -136,6 +140,7 @@ class laplace2DSolver():
 
         # add new geometry
         self.G.append(maskGeometry)
+        self.T.append(maskType)
         
         # merge according to type
         {   "C": self._mergeClrMask,
@@ -153,6 +158,45 @@ class laplace2DSolver():
     # merge type S mask
     def _mergeSetMask(self, S):
         self.S |= S
+        return
+
+    def incrementResolution(self):
+        
+        """ increase the resolution by a factor two. """
+
+        # set new resolution
+        self.p += 1
+        self.n = 2**self.p
+
+        # save current data for the upgrade
+        D = copy(self.D[1:-1, 1:-1])
+        """ edges are ingnored. """
+
+        # reserve memory for the new data set
+        self.D = full([self.n+2]*2, ZER, DATATYPE)
+        """ the new data set is initialised to ZER. This is used to
+        clear the data set edges. The rest of the array is overidden
+        during the "quadruplication" performed next. """
+
+        # quadruplicate the data set
+        self.D[1:-1:2, 1:-1:2] = D
+        self.D[2:-1:2, 1:-1:2] = D
+        self.D[1:-1:2, 2:-1:2] = D
+        self.D[2:-1:2, 2:-1:2] = D
+        """ the initial increase """
+
+        # reset default masks (transparent)
+        self.C = full([self.n+2]*2, MAX, DATATYPE) # clear mask
+        self.S = full([self.n+2]*2, ZER, DATATYPE) # set mask
+
+        # merge masks
+        for g, t in zip(self.G, self.T):
+            # merge according to type
+            {   "C": self._mergeClrMask,
+                "S": self._mergeSetMask,
+            }[t](g.mask(self.D))
+
+        # done
         return
 
     def plotPotentialDistribution(self, n = 30, pdfdoc = None):
@@ -199,24 +243,37 @@ class laplace2DSolver():
 
 from capycity.geometry import Disk
 
-SETUP, SOLVE, DISPLAY = 1, 1, 1
+SETUP, SOLVE, DISPLAY = 1, 1, 0
 
 # instanciate solver
-l = laplace2DSolver(7)
+l = laplace2DSolver(3)
 
 if SETUP:
 
-    l.mergeMask(Disk(0.05), "S") # MAX
-    l.mergeMask(Disk(0.45), "C") # ZER
+    l.mergeMask(Disk(0.20), "S") # MAX
+    l.mergeMask(Disk(0.40), "C") # ZER
 
 if SOLVE:
 
     # compute
-    for i in range(10000):
-          l.jacobiStep()
+    print(l.D)
+    print()
+
+    l.jacobiStep()
+    print(l.D)
+    print()
+
+    l.incrementResolution()
+    print(l.D)
+    print()
+
+    for i in range(23):
+        l.jacobiStep()
+    print(l.D)
+    print()
 
     # update data after solving
-    save(f"potential.npy", l.D)
+    # save(f"potential.npy", l.D)
 
 if DISPLAY:
 
@@ -226,13 +283,3 @@ if DISPLAY:
     p = PdfPages("results.pdf")
     l.plotPotentialDistribution(n = 50, pdfdoc = p)
     p.close()
-
-# figure of merit:
-# array size 128 X 128
-# number of iteration: 10,000
-# duration 3.4s
-
-# figure of merit:
-# array size 128 X 128
-# number of iteration: 100,000
-# duration 14s

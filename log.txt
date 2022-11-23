@@ -1,0 +1,16 @@
+# file: log.txt
+ 
+20221123
+
+COMMIT 8349d06ca69bd0b909e555c1a82b72e96b332c45
+
+figure of merit:
+array size 128 X 128
+number of iteration: 10,000
+duration 3.4s
+
+figure of merit:
+array size 128 X 128
+number of iteration: 100,000
+duration 14s
+
