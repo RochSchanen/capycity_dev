@@ -66,7 +66,7 @@ class Disk(_geometry):
 
     def discr(self, x, y):
         T = square(x) + square(y)
-        return (T < self.R)
+        return (T <= self.R)
 
     """ decorS created are only applied on the current figure. It must
     be applied on each figure that uses the decor """
@@ -92,6 +92,7 @@ class Disk(_geometry):
             0.0, 1.0,                       # vertical span
             edgecolor = (0.7, 0.7, 0.7),    # color
             linestyle = "--",               # line style
+            linewidth = 0.25,               # line thickness
             )
 
         # done

@@ -13,6 +13,9 @@ from numpy import copy
 from numpy import empty
 from numpy import square
 
+from numpy import concatenate
+from numpy import log
+
 # from numpy import save
 # from numpy import load
 
@@ -74,16 +77,26 @@ def plotPotentialContourFill(solver, n = 30, *args, pdfdoc = None, **kwargs):
 
 ####################################################### POTENTIAL CROSS SECTION
 
-def plotCrossSection(solver, *args, pdfdoc = None, **kwargs):
-    """  """
+def plotCrossSection(
+    solver,             # solver with data set
+    *args,              # arguments passed to "plot"
+    name   = None,      # figure name to add the plot to
+    pdfdoc = None,      # pdf document to add the figure to
+    **kwargs):          # more arguments passed to "plot"
+    """ explain """
 
-    # some parameters
+    # some default parameters
     plot_ticks = 0.1
 
-    if not pp.fignum_exists("Cross Section"):
+    # set generic name if undefined
+    if name is None:
+        # Further plot will be added to "plotCrossSection"
+        name = "plotCrossSection"
+
+    if not pp.fignum_exists(name):
 
         # create figure
-        fg = pp.figure("Cross Section")
+        fg = pp.figure(name)
 
         # set A4 paper dimensions
         fg.set_size_inches(8.2677, 11.6929)
@@ -105,7 +118,7 @@ def plotCrossSection(solver, *args, pdfdoc = None, **kwargs):
         i = int(solver.n // 2 + 1)
         Y = solver.D[i, 1:-1] / MAX
 
-        # make contour plot
+        # make plot
         pl = ax.plot(X, Y, *args, **kwargs)
 
         # adjust ticks
@@ -119,7 +132,7 @@ def plotCrossSection(solver, *args, pdfdoc = None, **kwargs):
     else:
 
         # select figure
-        fg = pp.figure("Cross Section")
+        fg = pp.figure(name)
 
         # select axes
         ax = fg.get_axes()[0]
@@ -135,6 +148,83 @@ def plotCrossSection(solver, *args, pdfdoc = None, **kwargs):
 
         # make contour plot
         pl = ax.plot(X, Y, *args, **kwargs)
+
+    # export figure to pdf
+    if pdfdoc: pdfdoc.savefig(fg)
+
+    # done
+    return
+
+####################################################### POTENTIAL THEORY
+
+def plotTheory(
+    r1, r2,             # inner and outer radius
+    v1, v2,             # inner and outer potential
+    *args,              # arguments passed to "plot"
+    name   = None,      # figure name to add the plot to
+    pdfdoc = None,      # pdf document to add the figure to
+    **kwargs):          # more arguments passed to "plot"
+    """ explain """
+
+    # some default parameters
+    plot_ticks = 0.1
+
+    # set generic name if undefined
+    if name is None:
+        # Further plot will be added to "plotCrossSection"
+        name = "plotCrossSection"
+
+    if not pp.fignum_exists(name):
+
+        # create figure
+        fg = pp.figure(name)
+
+        # set A4 paper dimensions
+        fg.set_size_inches(8.2677, 11.6929)
+
+        # create title
+        fg.suptitle(f"Potential Cross Section")
+
+        # create axis
+        w, h = array([1, 1 / 1.4143])*0.7
+        x, y = (1-w)/2, (1-h)/2
+        ax = fg.add_axes([x, y, w, h])
+
+        # x-coordinates
+        XL = arange(-r2, -r1+(r2-r1)/50, (r2-r1)/50)
+        XR = arange(+r1, +r2+(r2-r1)/50, (r2-r1)/50)
+
+        # y-coordinates
+        YL = log(-XL/r2)/log(r1/r2)
+        YR = log(+XR/r2)/log(r1/r2)
+
+        # make plot
+        pl = ax.plot(XR, YR, *args, **kwargs)
+        pl = ax.plot(XL, YL, *args, **kwargs)
+
+        # adjust ticks
+        ax.set_xticks(list(arange(-0.5, 0.5 + plot_ticks, plot_ticks)))
+        ax.set_yticks(list(arange(0.0, 1.0 + plot_ticks, plot_ticks)))
+
+    else:
+
+        # select figure
+        fg = pp.figure(name)
+
+        # select axes
+        ax = fg.get_axes()[0]
+
+        # x-coordinates
+        XL = arange(-r2, -r1+(r2-r1)/50, (r2-r1)/50)
+        XR = arange(+r1, +r2+(r2-r1)/50, (r2-r1)/50)
+
+        # y-coordinates
+        YL = log(-XL/r2)/log(r1/r2)
+        YR = log(+XR/r2)/log(r1/r2)
+
+        # make plot
+        pl = ax.plot(XR, YR, *args, **kwargs)
+        pl = ax.plot(XL, YL, *args, **kwargs)
 
     # export figure to pdf
     if pdfdoc: pdfdoc.savefig(fg)
