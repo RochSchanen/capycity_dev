@@ -66,7 +66,7 @@ class Disk(_geometry):
 
     def discr(self, x, y):
         T = square(x) + square(y)
-        return (T <= self.R)
+        return (T < self.R)
 
     """ decorS created are only applied on the current figure. It must
     be applied on each figure that uses the decor """
