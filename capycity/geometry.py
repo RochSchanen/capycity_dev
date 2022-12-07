@@ -1,6 +1,7 @@
 # file: geometry.py
-# author: roch schanen
-# date: 20221120
+# author: Roch Schanen
+# date: 2022-11-20
+# content: definition classes of the geometries used by the solver
 
 # from package: "https://matplotlib.org/"
 from matplotlib.pyplot import Circle
@@ -13,6 +14,11 @@ from numpy import shape
 from numpy import square
 
 class _geometry():
+    """ generic class:
+    1) Thge "__init__()" method invoques the user method "init()"
+    2) The "mask()" method invoques the user method "discr()" to detect
+    wether a point is whitin the mask boundaries.
+    """
 
     def __init__(self, *args, **kwargs):
         # call user init
@@ -48,28 +54,38 @@ class _geometry():
         return M
 
     def init(self):
+        """ the init method is used to pass the parameters that define
+        the mask geometry (height, width, thickness, etc...)
+        """
         pass
 
-    def decor(self):
-        pass
+    def discr(self, x, y):
+        """ the discr method is used to discriminate the points that belong
+        or not to the mask boundaries (disks, rectangles, etc...)
+        """
+        return False
 
-#####################################################################
+#####################################################################    DISK
 ###                            DISK                              ####
 #####################################################################
 
 class Disk(_geometry):
 
+    # parameters
     def init(self, r):
         self.r = r
         self.R = square(r)
         return
 
+    # discriminant
     def discr(self, x, y):
         T = square(x) + square(y)
         return (T < self.R)
 
-    """ decorS created are only applied on the current figure. It must
-    be applied on each figure that uses the decor """
+    ##########################################################
+    """ decors are created only on the current figure. It must
+    be created on each figure that wants to include that decor.
+    """
 
     def contour_decor(self):
         

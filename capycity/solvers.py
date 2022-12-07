@@ -1,3 +1,6 @@
+# file: solvers.py
+# author: Roch Schanen
+# created: 
 
 # from package: "https://matplotlib.org/"
 # from matplotlib.backends.backend_pdf import PdfPages
