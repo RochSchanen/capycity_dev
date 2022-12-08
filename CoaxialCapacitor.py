@@ -1,119 +1,118 @@
 # file: coaxialCapacitor.py
 
 # from package: "https://matplotlib.org/"
-from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.pyplot import plot
+from matplotlib.pyplot import title
 
 # from package: "https://numpy.org/"
-# from numpy import save
-# from numpy import load
+from numpy import arange
+from numpy import empty
+from numpy import square
+from numpy import sqrt
+from numpy import log
+from numpy import double
 
 # from package "capycity"
 from capycity.config   import ZER, MAX
 from capycity.solvers  import laplace2DSolver
 from capycity.geometry import Disk
-from capycity.graphics import plotPotentialContourFill
-from capycity.graphics import plotPotentialCrossSection
-from capycity.graphics import plotTheory
-from capycity.graphics import plotError
 
-#####################################################################
-###                            SOLVER                            ####
-#####################################################################
+from capycity.graphics import opendocument, closedocument
+from capycity.graphics import selectfigure, exportfigure
+from capycity.graphics import plotcontour
 
-document = PdfPages("results.pdf")
+opendocument("results.pdf")
 
-
+# local parameter
+r1 = 0.10
+r2 = 0.40
 
 # instanciate solver
 solver, p = laplace2DSolver(3), 0   # 8 X 8
-solver.mergeMask(Disk(0.10), "S")   # CENTER
-solver.mergeMask(Disk(0.40), "C")   # SHELL
+solver.mergeMask(Disk(r1), "S")     # CENTER
+solver.mergeMask(Disk(r2), "C")     # SHELL
 
 # inital computation
 solver.jacobiSteps(100)
 
 # iterate through increasing resolution
-# for n in [100, 100, 100, 1000, 1000, 1000]:
-for n in [100, 100, 100]:
+for n in [100, 100, 100, 1000, 5000]:
+# for n in [100, 100, 100, 100, 100]:
     # new graph name
     m, p = f"name_{p}", p+1
     # display info
-    print(f"new graph name {m}, {n} jacobi steps.")
+    print(f"new graph name {m}, {n} jacobi steps ({solver.n}X{solver.n}).")
     # increase resolution, run jacobi steps and plot
     solver.incrementResolution()
     solver.jacobiSteps(n)
-    
-    # plotPotentialCrossSection(
-    #     solver,
-    #     "k.", linewidth = 1.0,
-    #     name = m)
-    
-    # plotTheory(
-    #     0.1, 0.4, 0.0, 1.0,
-    #     "r--", linewidth = 1.0,
-    #     name = m, pdfdoc = document)
 
-    # plotError(
-    #     solver,
-    #     0.1, 0.4, 0.0, 1.0,
-    #     ".",
-    #     # linewidth = 1.0,
-    #     name = m,
-    #     pdfdoc = document)
+# compute theoretical distribution
+n = solver.n
+# reserve memory
+M = empty((n, n), dtype = double)
+# get grid origin
+o = (n - 1) / 2.0
+# get scaling factor, length = 1 unit
+a = 1.0 / n
+# compute theoretical values
+for i in range(n):
+    # compute coordinate
+    y = (i-o)*a
+    for j in range(n):
+        # compute coordinate
+        x = (j-o)*a
+        # compute radius
+        r = sqrt(square(x) + square(y))
+        # center
+        if r < r1:
+            M[i, j] = 1.0
+            continue
+        # shell
+        if r > r2:
+            M[i, j] = 0.0
+            continue
+        # vacuum
+        M[i, j] = log(r / r2) / log(r1 / r2)
 
-# central index of the cross section
-centerline = int(solver.n // 2 + 1)
+# center line index of the cross section
+cline = int(solver.n // 2 + 1)
+# compute parameters
+inter = solver.l / (solver.n - 1)
+limit = solver.l / 2
+# compute domain
+X = arange(-limit, +limit + inter, inter)
 
-# build parameters and data set
-interval = solver.l / (solver.n - 1)
-extremum = solver.l / 2
-X = arange(-extremum, +extremum + interval, interval)
-Y = solver.D[centerline, 1:-1] / MAX
+# FIGURE                                                      Potential contour
 
-# done
-document.close()
+plotcontour(solver, 30, name = "Potential Contour")
+title(" Potential [V]")
 
+# FIGURE                                               Potentials Cross Section
+ 
+fg, ax = selectfigure("Potential Cross Section")
+# select solver cross section and plot
+Y = solver.D[cline, 1:-1] / MAX
+plot(X, Y, "g-")
+# select theory cross section and plot
+T = M[cline, :]
+plot(X, T, "b--")
+ax.set_xticks(list(arange(-0.5, 0.5 + 0.1, 0.1)))
+ax.set_yticks(list(arange( 0.0, 1.0 + 0.1, 0.1)))
+title(" Potential [V]")
 
+# FIGURE                                                             Difference
 
+# compute difference and plot
+fg, ax = selectfigure("Difference")
+plot(X, 100*(Y-T), "r--")
+ax.set_xticks(list(arange(-0.5, 0.5 + 0.1, 0.1)))
+ax.set_yticks(list(arange(-5, 5 + 1, 1)))
+title("Error [%]")
 
+# EXPORT FIGURES
 
-
-
-
-
-
-
-
-
-
-
-
-
-################
-
-# # new graph
-
-# plotPotentialCrossSection(
-#     solver,
-#     "k-", linewidth = 1.0,
-#     name = "compare")
-
-# plotTheory(
-#     0.1, 0.4, 0.0, 1.0,
-#     "r--", linewidth = 1.0,
-#     name = "compare")
-
-# # new solver
-# solver, p = laplace2DSolver(solver.p), 0
-# solver.mergeMask(Disk(0.10), "S")   # CENTER
-# solver.mergeMask(Disk(0.40), "C")   # SHELL
-
-# # inital computation
-# solver.jacobiSteps(10000)
-
-# plotPotentialCrossSection(
-#     solver,
-#     "g-", linewidth = 1.0,
-#     name = "compare", pdfdoc = document)
-
-# [Finished in 946.5s]
+# export and done
+exportfigure("Potential Contour")
+exportfigure("Potential Cross Section")
+exportfigure("Difference")
+closedocument()
