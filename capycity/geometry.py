@@ -87,7 +87,7 @@ class Disk(_geometry):
     be created on each figure that wants to include that decor.
     """
 
-    def contour_decor(self):
+    def contour2D_decor(self):
         
         # build decor
         c = Circle(

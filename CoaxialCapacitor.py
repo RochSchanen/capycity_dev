@@ -3,6 +3,7 @@
 # from package: "https://matplotlib.org/"
 from matplotlib.pyplot import plot
 from matplotlib.pyplot import title
+from matplotlib.pyplot import quiver
 
 # from package: "https://numpy.org/"
 from numpy import arange
@@ -11,6 +12,7 @@ from numpy import square
 from numpy import sqrt
 from numpy import log
 from numpy import double
+from numpy import gradient
 
 # from package "capycity"
 from capycity.config   import ZER, MAX
@@ -19,7 +21,7 @@ from capycity.geometry import Disk
 
 from capycity.graphics import opendocument, closedocument
 from capycity.graphics import selectfigure, exportfigure
-from capycity.graphics import plotcontour
+from capycity.graphics import plotcontour, plotmesh
 
 opendocument("results.pdf")
 
@@ -84,7 +86,12 @@ X = arange(-limit, +limit + inter, inter)
 
 # FIGURE                                                      Potential contour
 
-plotcontour(solver, 30, name = "Potential Contour")
+plotcontour(solver, 16, name = "Potential Contour")
+title(" Potential [V]")
+
+# FIGURE                                                         Potential mesh
+
+plotmesh(solver, name = "Potential Mesh")
 title(" Potential [V]")
 
 # FIGURE                                               Potentials Cross Section
@@ -92,7 +99,7 @@ title(" Potential [V]")
 fg, ax = selectfigure("Potential Cross Section")
 # select solver cross section and plot
 Y = solver.D[cline, 1:-1] / MAX
-plot(X, Y, "g-")
+plot(X, Y, "g.")
 # select theory cross section and plot
 T = M[cline, :]
 plot(X, T, "b--")
@@ -106,13 +113,21 @@ title(" Potential [V]")
 fg, ax = selectfigure("Difference")
 plot(X, 100*(Y-T), "r--")
 ax.set_xticks(list(arange(-0.5, 0.5 + 0.1, 0.1)))
-ax.set_yticks(list(arange(-5, 5 + 1, 1)))
+# ax.set_yticks(list(arange(-5, 5 + 1, 1)))
 title("Error [%]")
+
+# FIGURE
+
+fg, ax = selectfigure("gradient")
+dY, dX = gradient(solver.D)
+quiver([X, X], dX[1:-1,1:-1], dY[1:-1,1:-1])
 
 # EXPORT FIGURES
 
 # export and done
+exportfigure("Potential Mesh")
 exportfigure("Potential Contour")
+exportfigure("gradient")
 exportfigure("Potential Cross Section")
 exportfigure("Difference")
 closedocument()

@@ -59,7 +59,69 @@ def plotcontour(solver, *args, name = "contour", **kwargs):
     
     # add decors
     for g in solver.G:
-        ax.add_artist(g.contour_decor())
+        ax.add_artist(g.contour2D_decor())
+    
+    # add new axis and color bar 
+    ax = fg.add_axes([x + w + x, y, k, h])
+    cb = fg.colorbar(pl, cax = ax)
+    cb.set_ticks(list(arange(0, 1 + ctk, ctk)))
+
+    # set contour as the current axis
+    sca(fg.get_axes()[0])
+
+    # done
+    return
+
+###################################################### POTENTIAL IMAGE MESH
+
+def plotmesh(solver, *args, name = "mesh", **kwargs):
+
+    # some parameters
+    ptk, ctk = 0.1, 0.1
+
+    # create figure
+    fg = pp.figure(name)
+    
+    # set A4 paper dimensions
+    fg.set_size_inches(8.2677, 11.6929)
+    
+    # create axis
+    w, h, k = [*list(array([1, 1 / 1.4143])*0.7), 0.03]
+    x, y = (1-w-k)/3, (1-h)/2
+    ax = fg.add_axes([x, y, w, h]) 
+    
+    # x-coordinates
+    d = solver.l/(solver.n-1)
+    l = d*(solver.n-1)/2
+    X = arange(-l, l+d, d)
+    
+    # y-coordinates
+    Y = solver.D[1:-1, 1:-1] / MAX
+    
+    # make contour plot
+    c = [pp.cm.inferno, pp.cm.terrain][0]
+
+    from matplotlib.colors import BoundaryNorm
+    from matplotlib.ticker import MaxNLocator
+    levels = MaxNLocator(nbins=15).tick_values(0.0, 1.0)
+    norm = BoundaryNorm(levels, ncolors=c.N, clip=True)
+    mapargs = {
+        "cmap":c,
+        # "vmin":0.0,
+        # "vmax":1.0,
+        "norm":norm,
+        "shading":'auto',
+        }
+
+    pl = ax.pcolormesh(X, X, Y, *args, **mapargs, **kwargs)
+    
+    # adjust ticks
+    ax.set_xticks(list(arange(-0.5, 0.5 + ptk, ptk)))
+    ax.set_yticks(list(arange(-0.5, 0.5 + ptk, ptk)))
+    
+    # add decors
+    for g in solver.G:
+        ax.add_artist(g.contour2D_decor())
     
     # add new axis and color bar 
     ax = fg.add_axes([x + w + x, y, k, h])
