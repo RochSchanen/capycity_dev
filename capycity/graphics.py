@@ -24,7 +24,7 @@ from capycity.config import DATATYPE, ZER, MAX
 
 ###################################################### POTENTIAL CONTOUR FILLED
 
-def plotcontour(solver, *args, name = "contour", **kwargs):
+def plotcontour(solver, *args, name = "CONTOUR", **kwargs):
 
     # some parameters
     ptk, ctk = 0.1, 0.1
@@ -74,7 +74,7 @@ def plotcontour(solver, *args, name = "contour", **kwargs):
 
 ###################################################### POTENTIAL IMAGE MESH
 
-def plotmesh(solver, *args, name = "mesh", **kwargs):
+def plotmesh(solver, *args, name = "MESH", **kwargs):
 
     # some parameters
     ptk, ctk = 0.1, 0.1
@@ -164,6 +164,7 @@ def opendocument(pathname):
     return _DOC
 
 def exportfigure(name):
+    print(f"export '{name}'")
     fg, ax = selectfigure(name)
     _DOC.savefig(fg)
     return

@@ -2,24 +2,18 @@
 # author: Roch Schanen
 # created: 
 
-# from package: "https://matplotlib.org/"
-# from matplotlib.backends.backend_pdf import PdfPages
-# from matplotlib.pyplot import contourf
-# from matplotlib import pyplot as pp
-
 # from package: "https://numpy.org/"
-from numpy import full
-# from numpy import arange
-# from numpy import array
-from numpy import copy
-# from numpy import empty
-# from numpy import square
+from numpy import full, copy, shape
+from numpy import load, save
 
+# from package: capycity (under heavy development)
 from capycity.config import DATATYPE, ZER, MAX
+
+##################################### Laplace equation solver in two dimensions
 
 class laplace2DSolver():
 
-    """ describe the genral use of this class """
+    """ describe here the general use of this class """
 
     p = None    # power of two
     n = None    # number of intervals
@@ -185,5 +179,40 @@ class laplace2DSolver():
                 "S": self._mergeSetMask,
             }[t](g.mask(self.D))
 
+        # done
+        return
+
+    def save(self, fp):
+        # save array without egdes
+        save(fp, self.D[+1:-1, +1:-1])
+        # done
+        return
+
+    def load(self, fp):
+        # load the array
+        D = load(fp)
+        # retrieve size
+        self.n, n = shape(D)
+        # compute power of two
+        # counting binary shifts
+        p = 0
+        while n:
+            n >>= 1
+            p  += 1
+        # record parameter
+        self.p = p - 1
+        # reserve memory
+        self.D = full([self.n+2]*2, ZER, DATATYPE)
+        """ the new data set is initialised to zeros.
+        This automatically clears the edges. """
+        # copy bulk
+        self.D[+1:-1, +1:-1] = D
+        # re-build masks
+        self.C = full([self.n+2]*2, MAX, DATATYPE) # clear mask
+        self.S = full([self.n+2]*2, ZER, DATATYPE) # set mask
+        for g, t in zip(self.G, self.T):
+            {   "C": self._mergeClrMask,
+                "S": self._mergeSetMask,
+            }[t](g.mask(self.D))
         # done
         return
