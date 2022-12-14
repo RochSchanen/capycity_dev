@@ -38,7 +38,7 @@ class _geometry():
         # compute grid origin
         o = (n - 1) / 2.0
         # compute scaling factor
-        a = 1.0 / n
+        a = 1.0 / (n - 2)
         # build masks:
         for i in range(n):
             # compute coordinate

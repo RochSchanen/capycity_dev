@@ -7,10 +7,12 @@ from matplotlib.pyplot import plot
 from matplotlib.pyplot import title
 from matplotlib.pyplot import quiver
 
+from matplotlib.patches import Rectangle
+
 # from package: "https://numpy.org/"
 from numpy import arange, double, empty, shape
 from numpy import square, sqrt, log
-from numpy import gradient, meshgrid
+from numpy import gradient, meshgrid, average
 from numpy import load, save
 
 # from package "capycity" (in development)
@@ -69,10 +71,9 @@ if exists(datapath_solver):
     print(f"resolution is {solver.n}X{solver.n}.")
 else:
     # compute initial resolution
-    solver.jacobiSteps(100) # 8 X 8
+    solver.jacobiSteps(500) # 8 X 8
     # iterate through increasing resolution
     for n in [100, 100, 100, 1000, 5000]: # 16, 32, 64, 128, 256
-    # for n in [100, 100]: # 16, 32
         # new graph name
         m, p = f"name_{p}", p+1
         # display info
@@ -90,13 +91,13 @@ if exists(datapath_theory):
     M = load(datapath_theory)
 else:
     # compute theoretical distribution
-    n = solver.n
+    n, n = shape(solver.D)
     # reserve memory
     M = empty((n, n), dtype = double)
     # get grid origin
     o = (n - 1) / 2.0
     # get scaling factor, length = 1 unit
-    a = 1.0 / n
+    a = 1.0 / (n - 2)
     # compute theoretical values
     for i in range(n):
         # compute coordinate
@@ -127,7 +128,7 @@ inherently smoothes out the data """
 
 if USEPLOT["CONTOUR"]:
     # print(f"plot potential contour")
-    plotcontour(solver, 16, name = "CONTOUR")
+    plotcontour(solver, 8, name = "CONTOUR")
     title(" Potential [V]")
 
 ###############################                                            MESH
@@ -145,12 +146,12 @@ quantitative form of information display """
 
 if USEPLOT["CROSSSECTION"]:
     # print(f"plot potential cross section")
+    n, n = shape(solver.D)
     # center line index
-    cline = int(solver.n // 2 + 1)
-    # limits
-    inter = solver.l / (solver.n - 1)
-    limit = solver.l / 2
-    # domain
+    cline = int((n -  2) // 2)
+    # limits and domain
+    inter = solver.l / (n - 2)
+    limit = (solver.l - inter) / 2.0
     X = arange(-limit, +limit + inter, inter)
     # create figure
     fg, ax = selectfigure("CROSSSECTION")
@@ -158,10 +159,12 @@ if USEPLOT["CROSSSECTION"]:
     Y = solver.D[cline, 1:-1] / MAX
     plot(X, Y, ".", color = "C0")
     # select theory cross section and plot
-    T = M[cline, :]
-    plot(X, T, "r--")
+    T = M[cline, +1:-1]
+    plot(X, T, "r-", linewidth = 0.75)
     ax.set_xticks(list(arange(-0.5, 0.5 + 0.1, 0.1)))
     ax.set_yticks(list(arange( 0.0, 1.0 + 0.1, 0.1)))
+    ax.grid(True, 'both')
+    ax.legend(["Numerical", "Analytical"])
     title(" Potential [V]")
 
 ###############################                                       ERROR [%]
@@ -172,7 +175,7 @@ the order of 1% is acceptable """
 if USEPLOT["ERROR"]:
     # print(f"plot Error")
     fg, ax = selectfigure("ERROR")
-    plot(X, 100*(Y-T), "r--")
+    plot(X, 100*(Y-T), "r.--")
     ax.set_xticks(list(arange(-0.5, 0.5 + 0.1, 0.1)))
     ax.set_yticks(list(arange(-5, 5 + 1, 1)))
     ax.grid(True, 'both')
@@ -180,28 +183,49 @@ if USEPLOT["ERROR"]:
 
 ###############################                                        GRADIENT
 """ this figure is useful to check
-the numerics consistency """
+consistency of the results """
+
+def coarsenresolution(X):
+    """ X is a floating point square array of dimension N X N
+    the array size is halved along both dimension (interlaced)
+    and the four output submatrices are averaged into one
+    output matrix of dimension N/2 X N/2. Of course N must
+    be an even value for the operation to be defined """ 
+    # copy submatrices
+    NW, NE = X[0::2, 0::2], X[0::2, 1::2]
+    SW, SE = X[1::2, 0::2], X[1::2, 1::2]
+    # return average
+    return (NW + NE + SW + SE) / 4.0
 
 if USEPLOT["GRADIENT"]:
+    # print(f"plot gradient")
     fg, ax = selectfigure("GRADIENT")
-    dY, dX = gradient(solver.D/MAX)
-    # quiver intervals
-    p = 2**(max(0, solver.p-4))
-    # limits
-    inter = solver.l / p
-    limit = solver.l / 2
-    # domain
-    D = arange(-limit, +limit, inter)
+    # normalise and remove edges
+    D = solver.D[1:-1, 1:-1] / MAX
+    # compute gradient components [a.u.]
+    dy, dx = gradient(D)
+    # compute intervals value [m]
+    d = solver.l / n
+    # scale to S.I. units [V/m]
+    EX, EY = dx / d, dy / d
+    # reduced data size by averaging for display clarity
+    n, n = shape(EY)
+    while n > 16: # choose here the number of arrows
+        EX = coarsenresolution(EX)
+        EY = coarsenresolution(EY)
+        n, n = shape(EY)
+    # limits and domain
+    d = solver.l / n
+    l = (solver.l - d) / 2.0
+    D = arange(-l, +l + d, d)
     X, Y = meshgrid(D, D)
-    quiver(
-        X, Y, 
-        dX[1:-1:p, 1:-1:p],
-        dY[1:-1:p, 1:-1:p],
+    # plot
+    quiver(X, Y, EX, EY,
         color="C0",
         # angles='xy',
         # scale_units='xy',
         scale_units='inches',
-        scale=2/25.4,
+        scale=0.2*1000/25.4,
         width=.005,
         pivot = 'mid',
         )
@@ -209,10 +233,22 @@ if USEPLOT["GRADIENT"]:
     ax.set_yticks(list(arange(-0.5, 0.5 + 0.1, 0.1)))
     ax.set_xlim(-0.6, +0.6)
     ax.set_ylim(-0.6, +0.6)
+    ax.grid(True)
+    # display volume element at point (0, 0) and other corners
+    for i, j in [(0, 0), (0, -1), (-1, 0), (-1, -1)]:
+        x, y = X[i, j], Y[i, j]
+        l, r, t, b = x-d/2, x+d/2, y+d/2, y-d/2
+        ax.add_patch(Rectangle((l, b), d, d,
+            edgecolor   = None,
+            facecolor   = "gainsboro",
+            # fill        = False,
+            # linewidth   = 0.5,
+            zorder      = 0,
+            ))
 
 ################################################################# EXPORT TO PDF
 
-opendocument("plots.pdf")
+opendocument("./local/output.pdf")
 for k in USEPLOT.keys():
     if USEPLOT[k]:
         exportfigure(k) 

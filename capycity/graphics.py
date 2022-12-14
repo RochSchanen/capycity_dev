@@ -66,11 +66,12 @@ def plotcontour(solver, *args, name = "CONTOUR", **kwargs):
     cb = fg.colorbar(pl, cax = ax)
     cb.set_ticks(list(arange(0, 1 + ctk, ctk)))
 
-    # set contour as the current axis
-    sca(fg.get_axes()[0])
-
+    # get contour axis reference
+    ax = fg.get_axes()[0]
+    # set as current axis
+    sca(ax)
     # done
-    return
+    return fg, ax
 
 ###################################################### POTENTIAL IMAGE MESH
 
@@ -128,11 +129,12 @@ def plotmesh(solver, *args, name = "MESH", **kwargs):
     cb = fg.colorbar(pl, cax = ax)
     cb.set_ticks(list(arange(0, 1 + ctk, ctk)))
 
-    # set contour as the current axis
-    sca(fg.get_axes()[0])
-
+    # get contour axis reference
+    ax = fg.get_axes()[0]
+    # set as current axis
+    sca(ax)
     # done
-    return
+    return fg, ax
 
 # FIGURE FUNCTIONS FOR EXPORT
 
