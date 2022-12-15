@@ -5,6 +5,7 @@
 # from package: "https://numpy.org/"
 from numpy import full, copy, shape
 from numpy import load, save
+from numpy import invert
 
 # from package: capycity (under heavy development)
 from capycity.config import DATATYPE, ZER, MAX
@@ -15,18 +16,19 @@ class laplace2DSolver():
 
     """ describe here the general use of this class """
 
-    p = None    # power of two
-    n = None    # number of intervals
-    l = None    # physical length
-
-    G = []      # mask geometries
-    T = []      # mask types
+    # p = None    # power of two
+    # n = None    # number of intervals
+    # l = None    # physical length
+    # G = []      # mask geometries
+    # T = []      # mask types
 
     def __init__(self, p = 3):
         """ For computational reason, the grid is square and its size
         is always a power of two. p is the power value and n the grid
         size. Both masks are the same size as the data array. An extra
         layer of zeroes is added at the edge of the square arrays for. """
+
+        self.G, self.T = [], []
 
         # debug
         print(f"Run Laplace 2D Solver")
@@ -121,15 +123,16 @@ class laplace2DSolver():
         # done
         return
 
-    def mergeMask(self, maskGeometry, maskType = "S"):
+    def mergeMask(self, maskGeometry, maskType = "1"):
+        """ 1 is for SET mask,  0 is for CLEAR mask """
 
         # add new geometry
         self.G.append(maskGeometry)
         self.T.append(maskType)
         
         # merge according to type
-        {   "C": self._mergeClrMask,
-            "S": self._mergeSetMask,
+        {   "0": self._mergeClrMask,
+            "1": self._mergeSetMask,
         }[maskType](maskGeometry.mask(self.D))
         
         # done
@@ -137,7 +140,7 @@ class laplace2DSolver():
 
     # merge type C mask
     def _mergeClrMask(self, C):
-        self.C &= C
+        self.C &= invert(C)
         return
 
     # merge type S mask
@@ -175,8 +178,8 @@ class laplace2DSolver():
         self.C = full([self.n+2]*2, MAX, DATATYPE) # clear mask
         self.S = full([self.n+2]*2, ZER, DATATYPE) # set mask
         for g, t in zip(self.G, self.T):
-            {   "C": self._mergeClrMask,
-                "S": self._mergeSetMask,
+            {   "0": self._mergeClrMask,
+                "1": self._mergeSetMask,
             }[t](g.mask(self.D))
 
         # done
@@ -211,8 +214,8 @@ class laplace2DSolver():
         self.C = full([self.n+2]*2, MAX, DATATYPE) # clear mask
         self.S = full([self.n+2]*2, ZER, DATATYPE) # set mask
         for g, t in zip(self.G, self.T):
-            {   "C": self._mergeClrMask,
-                "S": self._mergeSetMask,
+            {   "0": self._mergeClrMask,
+                "1": self._mergeSetMask,
             }[t](g.mask(self.D))
         # done
         return

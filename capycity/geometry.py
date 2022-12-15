@@ -101,15 +101,38 @@ class Disk(_geometry):
         # done
         return c
 
-    def section_decor(self):
+#####################################################################  APERTURE
+###                            APERTURE                          ####
+#####################################################################
 
-        l = vlines(
-            [-self.r, +self.r],             # horizontal positions
-            0.0, 1.0,                       # vertical span
+class Aperture(_geometry):
+
+    # parameters
+    def init(self, r):
+        self.r = r
+        self.R = square(r)
+        return
+
+    # discriminant
+    def discr(self, x, y):
+        T = square(x) + square(y)
+        return (T > self.R)
+
+    ##########################################################
+    """ decors are created only on the current figure. It must
+    be created on each figure that wants to include that decor.
+    """
+
+    def contour2D_decor(self):
+        
+        # build decor
+        c = Circle(
+            (0.0, 0.0),                     # origin
+            self.r,                         # size
             edgecolor = (0.7, 0.7, 0.7),    # color
             linestyle = "--",               # line style
-            linewidth = 0.25,               # line thickness
-            )
-
+            fill = False,                   # fill style
+            )   
+        
         # done
-        return l
+        return c
