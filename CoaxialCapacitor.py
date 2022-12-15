@@ -419,3 +419,39 @@ for k in USEPLOT.keys():
     if USEPLOT[k]:
         exportfigure(k) 
 closedocument()
+
+"""
+ OUTPUT:
+     JOB FINNISHED IN ABOUT 12 minutes: 757s
+     ERROR FROM THEORY IS LESS THAN A PERCENT : -0.54 %
+
+Run Laplace 2D Solver
+step name_0, 500 jacobi steps (8X8).
+step name_1, 500 jacobi steps (16X16).
+step name_2, 500 jacobi steps (32X32).
+step name_3, 500 jacobi steps (64X64).
+step name_4, 1000 jacobi steps (128X128).
+step name_5, 2000 jacobi steps (256X256).
+step name_6, 5000 jacobi steps (512X512).
+step name_7, 10000 jacobi steps (1024X1024).
+Run Laplace 2D Solver
+step name_0, 500 jacobi steps (8X8).
+step name_1, 500 jacobi steps (16X16).
+step name_2, 500 jacobi steps (32X32).
+step name_3, 500 jacobi steps (64X64).
+step name_4, 1000 jacobi steps (128X128).
+step name_5, 2000 jacobi steps (256X256).
+step name_6, 5000 jacobi steps (512X512).
+step name_7, 10000 jacobi steps (1024X1024).
+integrale C/l = -3.992e-11 F/m
+theory C/l = -4.013e-11 F/m
+error = -0.54 %
+export 'CROSSSECTION'
+export 'ERROR'
+export 'CONTOUR 1'
+export 'GRADIENT 1'
+export 'CONTOUR 2'
+export 'GRADIENT 2'
+[Finished in 757.0s]
+
+"""
