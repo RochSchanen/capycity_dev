@@ -41,7 +41,7 @@ CLEAR = True
 P0 = 3 # 8 X 8
 
 # computation series 8, 16, 32, 64, 128, 256, 512, 1024
-SERIES = [100, 100, 100, 100, 100, 100, 100, 100]
+SERIES = [500, 500, 500, 500, 1000, 2000, 5000, 10000]
 
 # local parameters
 r1 = 0.10   # center radius
