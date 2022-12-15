@@ -4,7 +4,7 @@
 # content: definition classes of the geometries used by the solver
 
 # from package: "https://matplotlib.org/"
-from matplotlib.pyplot import Circle
+from matplotlib.pyplot import Circle, Rectangle
 from matplotlib.pyplot import vlines
 
 # from package: "https://numpy.org/"
@@ -65,7 +65,7 @@ class _geometry():
         """
         return False
 
-#####################################################################    DISK
+#####################################################################      DISK
 ###                            DISK                              ####
 #####################################################################
 
@@ -112,27 +112,64 @@ class Aperture(_geometry):
         self.r = r
         self.R = square(r)
         return
-
+    
     # discriminant
     def discr(self, x, y):
         T = square(x) + square(y)
         return (T > self.R)
-
-    ##########################################################
-    """ decors are created only on the current figure. It must
-    be created on each figure that wants to include that decor.
-    """
-
+    
+    # graph
     def contour2D_decor(self):
-        
-        # build decor
         c = Circle(
             (0.0, 0.0),                     # origin
             self.r,                         # size
             edgecolor = (0.7, 0.7, 0.7),    # color
             linestyle = "--",               # line style
             fill = False,                   # fill style
-            )   
-        
+            )
         # done
         return c
+
+#####################################################################     PLATE
+###                            PLATE                             ####
+#####################################################################
+
+class Plate(_geometry):
+
+    # parameters
+    def init(self, x, y, w, h):
+        # record parameters
+        self.geometry = x-w/2, x+w/2, y+h/2, y-h/2
+        # done
+        return
+
+    # discriminant
+    def discr(self, x, y):
+        
+        # left, right, top, bottom
+        l, r, t, b = self.geometry
+        
+        # test by rejection
+        if x < l: return False
+        if x > r: return False
+        if y > t: return False
+        if y < b: return False
+        
+        # point checks in
+        return True
+
+    def contour2D_decor(self):
+        
+        # parameters
+        l, r, t, b = self.geometry
+
+        # patch
+        r = Rectangle((l, b), r-l, t-b,
+            edgecolor = (0.7, 0.7, 0.7),    # color
+            linestyle = "--",               # line style
+            fill        = False,            # no filling
+            )
+
+        # done
+        return r
+

@@ -3,9 +3,9 @@
 # created: 
 
 # from package: "https://numpy.org/"
-from numpy import full, copy, shape
+from numpy import full, copy, shape, meshgrid
 from numpy import load, save
-from numpy import invert
+from numpy import invert, gradient, arange
 
 # from package: capycity (under heavy development)
 from capycity.config import DATATYPE, ZER, MAX
@@ -28,7 +28,9 @@ class laplace2DSolver():
         size. Both masks are the same size as the data array. An extra
         layer of zeroes is added at the edge of the square arrays for. """
 
+        # local
         self.G, self.T = [], []
+        self.dD = None, None
 
         # debug
         print(f"Run Laplace 2D Solver")
@@ -52,7 +54,17 @@ class laplace2DSolver():
         # set array physical length [m]
         self.l = +1.0E+0
 
+        # compute mesh
+        self._computemesh()
+
         # done
+        return
+
+    def _computemesh(self):
+        d = self.l / self.n         # interval
+        l = (self.l - d) / 2.0      # limit
+        D = arange(-l, +l + d, d)   # domain
+        self.mesh = meshgrid(D, D)  # mesh
         return
 
     def applyMasks(self):
@@ -182,6 +194,9 @@ class laplace2DSolver():
                 "1": self._mergeSetMask,
             }[t](g.mask(self.D))
 
+        # re-compute mesh
+        self._computemesh()
+
         # done
         return
 
@@ -196,7 +211,7 @@ class laplace2DSolver():
         D = load(fp)
         # retrieve size
         self.n, n = shape(D)
-        # compute power of two
+        # compute power of two by
         # counting binary shifts
         p = 0
         while n:
@@ -210,12 +225,24 @@ class laplace2DSolver():
         This automatically clears the edges. """
         # copy bulk
         self.D[+1:-1, +1:-1] = D
-        # re-build masks
+        # build masks
         self.C = full([self.n+2]*2, MAX, DATATYPE) # clear mask
         self.S = full([self.n+2]*2, ZER, DATATYPE) # set mask
         for g, t in zip(self.G, self.T):
             {   "0": self._mergeClrMask,
                 "1": self._mergeSetMask,
             }[t](g.mask(self.D))
+        # compute mesh
+        self._computemesh()
+        # done
+        return
+
+    def computegradient(self):
+        # compute interval
+        d = self.l / self.n
+        # compute gradient without edges
+        dDy, dDx = gradient(self.D[1:-1, 1:-1] / MAX)
+        # fix units and record gradient without edges
+        self.dD = dDx / d, dDy / d
         # done
         return
