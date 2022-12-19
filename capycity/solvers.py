@@ -145,7 +145,7 @@ class laplace2DSolver():
         # merge according to type
         {   "0": self._mergeClrMask,
             "1": self._mergeSetMask,
-        }[maskType](maskGeometry.mask(self.D))
+        }[maskType](maskGeometry.mask(self))
         
         # done
         return
@@ -166,6 +166,10 @@ class laplace2DSolver():
         "wave" at a slower "velocity". At lower resolutions the convergence 
         to a solution is quicker. In order to benefit from that fact, an  """
 
+        VERBOSE = False
+
+        if VERBOSE: print("<-", end = "")
+
         # update new resolution
         self.p += 1
         self.n = 2**self.p
@@ -180,11 +184,15 @@ class laplace2DSolver():
         This is clearing up the edges. The rest of the
         array is defined during the "quadruplication """
 
+        if VERBOSE: print("quad-", end = "")
+
         # quadruplicate the data set
         self.D[1:-1:2, 1:-1:2] = D
         self.D[2:-1:2, 1:-1:2] = D
         self.D[1:-1:2, 2:-1:2] = D
         self.D[2:-1:2, 2:-1:2] = D
+
+        if VERBOSE: print("mask-", end = "")
 
         # re-build masks
         self.C = full([self.n+2]*2, MAX, DATATYPE) # clear mask
@@ -192,10 +200,13 @@ class laplace2DSolver():
         for g, t in zip(self.G, self.T):
             {   "0": self._mergeClrMask,
                 "1": self._mergeSetMask,
-            }[t](g.mask(self.D))
+            }[t](g.mask(self))
 
+        if VERBOSE: print("mesh-", end = "")
         # re-compute mesh
         self._computemesh()
+
+        if VERBOSE: print(">")
 
         # done
         return
@@ -231,7 +242,7 @@ class laplace2DSolver():
         for g, t in zip(self.G, self.T):
             {   "0": self._mergeClrMask,
                 "1": self._mergeSetMask,
-            }[t](g.mask(self.D))
+            }[t](g.mask(self))
         # compute mesh
         self._computemesh()
         # done
