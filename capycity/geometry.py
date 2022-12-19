@@ -1,15 +1,13 @@
 # file: geometry.py
 # author: Roch Schanen
 # date: 2022-11-20
-# content: definition classes for the geometries used by the solver
+# content: mask geometries used by the solver
 
 # from package: "https://matplotlib.org/"
 from matplotlib.pyplot import Circle, Rectangle
-# from matplotlib.pyplot import vlines, hlines
 
 # from package: "https://numpy.org/"
-from numpy import array, empty, shape, asarray
-from numpy import ceil, floor
+from numpy import asarray, ceil, floor
 
 # from package "https://python-pillow.org/"
 from PIL import Image, ImageDraw

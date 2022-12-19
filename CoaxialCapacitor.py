@@ -1,5 +1,5 @@
 # file: coaxialCapacitor.py
-# author: Roch Schanen
+# author: Roch Scha`en
 # updated: 2022 12 12
 
 # from package: "https://matplotlib.org/"
