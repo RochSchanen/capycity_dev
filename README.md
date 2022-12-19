@@ -1,6 +1,6 @@
 # capycity
 
-A micro package for computing simple capacitive systems.
+A micro-package for computing capacitance.
 
 To install the package locally, open a terminal, change your current directory to development directory "capycity_dev" and run the command "pip intall ."
 
