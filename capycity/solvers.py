@@ -33,7 +33,7 @@ class laplace2DSolver():
         self.dD = None, None
 
         # debug
-        print(f"Run Laplace 2D Solver")
+        # print(f"Run Laplace 2D Solver")
 
         # set resolution
         self.p = p
