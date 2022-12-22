@@ -47,7 +47,7 @@ D3 = array([
 from capycity.graphics import selectfigure, exportfigure
 from capycity.graphics import opendocument, closedocument
 
-fg, ax = selectfigure("FIGURE")
+fg, ax = selectfigure("F")
 
 ax.plot(D1,"b.-")
 ax.plot(D2,"r.-")
@@ -65,6 +65,6 @@ from numpy import arange
 C = e0 * w / g * arange(1.0, -0.1, -0.1)
 ax.plot(C*1E12,"k--")
 
-opendocument("./local/plot2.pdf")
-exportfigure("FIGURE") 
+opendocument("./local/plot.pdf")
+exportfigure("F") 
 closedocument()
