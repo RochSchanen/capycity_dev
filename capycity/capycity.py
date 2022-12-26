@@ -2,15 +2,18 @@
 # LIBRARIES
 
 # from package: "https://numpy.org/"
+from numpy import log
 from numpy import full
 from numpy import ceil
 from numpy import copy
+from numpy import diff
 from numpy import floor
 from numpy import array
 from numpy import invert
 from numpy import arange
 from numpy import asarray
 from numpy import gradient
+from numpy import logspace
 from numpy import meshgrid
 from numpy import sum as SUM
 from numpy import multiply as MLT
@@ -41,9 +44,9 @@ from numpy import uint32 as _DT
 ZV, MV = array([0, -1], _DT)
 
 # DEBUG DISPLAY
-VERBOSE = False
+VERBOSE_MAP = False
+VERBOSE = True
 
-# SOLVER CLASS
 class SolverTwoDimensions():
 
     def __init__(self, px = 3, py = None):
@@ -147,6 +150,52 @@ class SolverTwoDimensions():
         self.k += n
         # done
         return
+
+    def jacobiStepSeries(self, S, n = 100):
+
+        i, a = 0, N[0]
+
+        if VERBOSE:
+            nx, ny = self.nn
+            print(f"resolution: {nx}x{ny}")
+
+        K, R = [], []
+
+        # record first point
+        K.append(self.k)  
+        R.append(self.computeCapacitance("shield", "core"))
+
+        # compute steps series
+        m = ceil(log(sum(S)) / log(10))
+        I = diff(logspace(1, m, n, dtype = 'int'))
+
+        # first point
+        R.append(self.computeCapacitance("shield", "core"))
+        K.append(self.k)
+
+        for n in I:
+            self.jacobiSteps(n)
+            # record new point
+            K.append(self.k)  
+            R.append(self.computeCapacitance("shield", "core"))
+            # check if new resolution triggered
+            if self.k < a: continue
+            if i+1 == len(N): break
+            print(f"{K[-1]:6}, {R[-1]*1E12:.3f}")
+            i, a = i+1, a + N[i+1]
+            self.incrementResolution()
+            if VERBOSE:
+                nx, ny = self.nn
+                print(f"resolution: {nx}x{ny}")
+            K.append(self.k)
+            R.append(self.computeCapacitance("shield", "core"))
+
+        # last point
+        K.append(self.k)
+        R.append(self.computeCapacitance("shield", "core"))
+
+        # done 
+        return K, R
 
     def computegradient(self, name):
         nx, ny = self.nn
@@ -254,8 +303,8 @@ class _map():
         self.D = full([nx+2, ny+2], ZV, _DT) # DATA MAP (BETWEEN COMPONENTS)
         self.C = full([nx+2, ny+2], MV, _DT) # CLEAR MAP (OTHER COMPONENTS)
         self.A = full([nx+2, ny+2], ZV, _DT) # ANCHOR MAP (THIS COMPONENT)
-        if VERBOSE: print(f"map:")
-        if VERBOSE: print(f"{self.D}")
+        if VERBOSE_MAP: print(f"map:")
+        if VERBOSE_MAP: print(f"{self.D}")
         # masks
         self.M = None
         # gradients
@@ -287,8 +336,8 @@ class _map():
         # self.A |= self.M.mask(nn, ll)
         self.A = self.M.mask(nn, ll)
         
-        if VERBOSE: print(f"anchor map:")
-        if VERBOSE: print(f"{self.A}:")
+        if VERBOSE_MAP: print(f"anchor map:")
+        if VERBOSE_MAP: print(f"{self.A}:")
         # done
         return
 
@@ -589,7 +638,7 @@ class Document():
         self._DOC.close()
         return
 
-def selectfigure(name):         
+def selectfigure(name):
     if not fignum_exists(name):
         # create figure
         fg = figure(name)
@@ -607,44 +656,159 @@ def selectfigure(name):
     # done
     return fg, ax
 
-S = SolverTwoDimensions(3)
-S.addMap("core", DiskSolid(0.1))
-S.addMap("shield", DiskAperture(0.45))
-
-R = []
-K = []
-
-nx, ny = S.nn
-print(f"resolution: {nx}x{ny}")
-
-# first point
-R.append(S.computeCapacitance("shield", "core"))
-K.append(S.k)
-
-# first series
-for n in [1]*30:
-    S.jacobiSteps(n)
-    R.append(S.computeCapacitance("shield", "core"))
-    K.append(S.k)
-
-# resolution series
-for s in [[5]*30]*8:
-    S.incrementResolution()
-    nx, ny = S.nn
-    print(f"resolution: {nx}x{ny}")
-    R.append(S.computeCapacitance("shield", "core"))
-    K.append(S.k)
-    for n in s:
-        S.jacobiSteps(n)
-        R.append(S.computeCapacitance("shield", "core"))
-        K.append(S.k)
-
-fg, ax = selectfigure("FIGURE")
-# ax.plot(K, array(R)*1E12, ".-")
-ax.semilogx(K, array(R)*1E12, ".-")
-ax.grid("True")
+###############################################################################
 
 D = Document()
 D.opendocument("../local/plot.pdf")
+fg, ax = selectfigure("FIGURE")
+
+NN = [
+    #     8  16  32   64  128  256  512 1024 2048
+    (3, [20, 20, 20, 100, 100, 200, 200, 200, 200]),
+]
+
+for p, N in NN:
+    S = SolverTwoDimensions(p)
+    S.addMap("core", DiskSolid(0.1))
+    S.addMap("shield", DiskAperture(0.45))
+    K, R = S.jacobiStepSeries(N)
+    print(f"{K[-1]:6}, {R[-1]*1E12:.3f}")
+    ax.semilogx(K, array(R)*1E12, ".-")
+
+ax.grid("True")
+# full figure
 D.exportfigure("FIGURE") 
+
+# partial plot center on each resolution series
+for x1, x2, y1, y2, tt in [
+    (   1,    50, -5.0, 30.0,    "8 x 8"),
+    (  10,   150, 25.0, 38.0,   "16 x 16"),
+    (  80,   400, 29.0, 38.0,   "32 x 32"),
+    ( 250,   800, 29.0, 33.0,   "64 x 64"),
+    ( 500,  4000, 32.0, 37.0,  "128 x 128"),
+    (2500,  5000, 35.5, 37.0,  "256 x 256"),
+    (3500,  7000, 36.4, 37.0,  "512 x 512"),
+    (5000, 10000, 36.5, 37.0, "1024 x 1024"),
+    (5000, 20000, 36.6, 37.0, "2048 x 2048"),
+    ]:
+
+    ax.set_xlim(x1, x2)
+    ax.set_ylim(y1, y2)
+    ax.set_title(tt)
+    D.exportfigure("FIGURE") 
+
 D.closedocument()
+
+###############################################################################
+###                     3 SETS OF SELECTED RESULTS                          ###
+###############################################################################
+
+# SET 1 #######################################################################
+
+"""
+
+8 X 8 -> 4096 X 4096
+
+NN = [
+    (3, [2]*10),
+    (3, [5]*10),
+    (3, [10]*10),
+    (3, [50]*10),
+    (3, [100]*10),
+    (3, [500]*10),
+    (3, [1000]*10),
+]
+
+ steps, capacitance
+
+    20, 0.352   0.35
+    50, 29.103  29.1
+    91, 37.478  37.5
+   512, 37.646  37.6
+   991, 37.448  37.4
+  5327, 37.016  37.0
+  9991, 36.981  37.0
+
+"capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries.pdf"
+
+"""
+
+# SET 2 #######################################################################
+
+"""
+
+NN = [
+    #     8  16   32   64   128   256   512  1024  2048
+    (3, [20, 75, 200, 400, 2000, 1200, 2000, 2000, 10000]),
+]
+
+for x1, x2, y1, y2, tt in [
+    (   1,    50, -5.0, 30.0,    "8 x 8"),
+    (  10,   150, 25.0, 38.0,   "16 x 16"),
+    (  80,   400, 29.0, 38.0,   "32 x 32"),
+    ( 250,   800, 29.0, 33.0,   "64 x 64"),
+    ( 500,  4000, 32.0, 37.0,  "128 x 128"),
+    (2500,  5000, 35.5, 37.0,  "256 x 256"),
+    (3500,  7000, 36.4, 37.0,  "512 x 512"),
+    (5000, 10000, 36.5, 37.0, "1024 x 1024"),
+    (5000, 20000, 36.6, 37.0, "2048 x 2048"),
+    ]:
+
+ steps, capacitance
+
+   8x8,       21,  26.128
+  16x16,     103,  33.220
+  32x32,     303,  29.493
+  64x64,     713,  32.648
+ 128x128,   2906,  35.712
+ 256x256,   4220,  36.706
+ 512x512,   6126,  36.558
+1024x1024,  8102,  36.699
+2048x2048, 18729, 36.912
+
+[Finished in 3665.9s]
+
+One minute past an hour: mostly the last series: 2048x2048: 10000 points
+
+"capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries-2.pdf"
+
+"""
+
+# SET 3 #######################################################################
+
+"""
+
+NN = [
+    #     8  16  32   64  128  256  512 1024 2048
+    (3, [20, 20, 20, 100, 100, 200, 200, 200, 200]),
+]
+
+for x1, x2, y1, y2, tt in [
+    (   1,    50, -5.0, 30.0,    "8 x 8"),
+    (  10,   150, 25.0, 38.0,   "16 x 16"),
+    (  80,   400, 29.0, 38.0,   "32 x 32"),
+    ( 250,   800, 29.0, 33.0,   "64 x 64"),
+    ( 500,  4000, 32.0, 37.0,  "128 x 128"),
+    (2500,  5000, 35.5, 37.0,  "256 x 256"),
+    (3500,  7000, 36.4, 37.0,  "512 x 512"),
+    (5000, 10000, 36.5, 37.0, "1024 x 1024"),
+    (5000, 20000, 36.6, 37.0, "2048 x 2048"),
+    ]:
+
+    21, 26.128
+    40, 33.570
+    61, 30.552
+   165, 32.713
+   275, 35.732
+   488, 36.788
+   696, 36.623
+   860, 36.774
+  1063, 37.024
+
+[Finished in 74.0s]
+
+only fourteen seconds past one minute!
+
+"capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries-3.pdf"
+
+"""
