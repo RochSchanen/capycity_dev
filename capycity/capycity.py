@@ -2,18 +2,17 @@
 # LIBRARIES
 
 # from package: "https://numpy.org/"
-from numpy import log
+from numpy import linspace, logspace
+from numpy import ceil, floor
+from numpy import log, log10, exp
 from numpy import full
-from numpy import ceil
 from numpy import copy
 from numpy import diff
-from numpy import floor
 from numpy import array
 from numpy import invert
 from numpy import arange
 from numpy import asarray
 from numpy import gradient
-from numpy import logspace
 from numpy import meshgrid
 from numpy import sum as SUM
 from numpy import multiply as MLT
@@ -26,10 +25,12 @@ from PIL import ImageDraw
 from scipy.constants import epsilon_0 as EPS0
 
 # from package: "https://matplotlib.org/"
+from matplotlib.pyplot import sca
 from matplotlib.pyplot import Circle
 from matplotlib.pyplot import figure
 from matplotlib.pyplot import Rectangle
 from matplotlib.pyplot import fignum_exists
+from matplotlib.pyplot import cm
 from matplotlib.backends.backend_pdf import PdfPages
 
 # DATA TYPE
@@ -45,7 +46,7 @@ ZV, MV = array([0, -1], _DT)
 
 # DEBUG DISPLAY
 VERBOSE_MAP = False
-VERBOSE = True
+VERBOSE = False
 
 class SolverTwoDimensions():
 
@@ -91,12 +92,12 @@ class SolverTwoDimensions():
         # done
         return
 
-    """ create a new map to hold a new component to the capacitance. A CLEAR
-    map and a ANCHOR map are automatically added for the computation. The
-    ANCHOR map should contain the shape of the solid. where the maps is solid
-    the value is VM, otherwise, the value is ZV. A clear map is build from
-    the other maps. """
     def addMap(self, name, mask = None):
+        """ create a new map to hold a new component to the capacitance. A CLEAR
+        map and a ANCHOR map are automatically added for the computation. The
+        ANCHOR map should contain the shape of the solid. where the maps is solid
+        the value is VM, otherwise, the value is ZV. A clear map is build from
+        the other maps. """
         if VERBOSE: print(f"new map '{name.upper()}'")
         # instanciate new map class
         self.M[name] = _map(self.nn)
@@ -151,7 +152,7 @@ class SolverTwoDimensions():
         # done
         return
 
-    def jacobiStepSeries(self, S, n = 100):
+    def jacobiStepSeries(self, S, C1, C2, n = 100):
 
         i, a = 0, N[0]
 
@@ -163,36 +164,36 @@ class SolverTwoDimensions():
 
         # record first point
         K.append(self.k)  
-        R.append(self.computeCapacitance("shield", "core"))
+        R.append(self.computeCapacitance(C1, C2))
 
         # compute steps series
         m = ceil(log(sum(S)) / log(10))
         I = diff(logspace(1, m, n, dtype = 'int'))
 
         # first point
-        R.append(self.computeCapacitance("shield", "core"))
+        R.append(self.computeCapacitance(C1, C2))
         K.append(self.k)
 
         for n in I:
             self.jacobiSteps(n)
             # record new point
             K.append(self.k)  
-            R.append(self.computeCapacitance("shield", "core"))
+            R.append(self.computeCapacitance(C1, C2))
             # check if new resolution triggered
             if self.k < a: continue
             if i+1 == len(N): break
-            print(f"{K[-1]:6}, {R[-1]*1E12:.3f}")
+            if VERBOSE: print(f"{K[-1]:6}, {R[-1]*1E12:.3f}")
             i, a = i+1, a + N[i+1]
             self.incrementResolution()
             if VERBOSE:
                 nx, ny = self.nn
                 print(f"resolution: {nx}x{ny}")
             K.append(self.k)
-            R.append(self.computeCapacitance("shield", "core"))
+            R.append(self.computeCapacitance(C1, C2))
 
         # last point
         K.append(self.k)
-        R.append(self.computeCapacitance("shield", "core"))
+        R.append(self.computeCapacitance(C1, C2))
 
         # done 
         return K, R
@@ -446,7 +447,7 @@ class DiskSolid():
         return M
 
     # graph for 2D display
-    def decorTwoDimensions(self):
+    def decor(self):
         c = Circle(
             (0.0, 0.0),                     # origin
             self.r,                         # size
@@ -503,7 +504,7 @@ class DiskAperture():
         return M
 
     # graph for 2D display
-    def decorTwoDimensions(self):
+    def decor(self):
         c = Circle(
             (0.0, 0.0),                     # origin
             self.r,                         # size
@@ -559,7 +560,7 @@ class PlateSolid():
         # done
         return M
 
-    def decorTwoDimensions(self):
+    def decor(self):
         # get geometry
         l, r = self.l, self.r
         t, b = self.t, self.b
@@ -617,11 +618,24 @@ class PlateAperture():
         # done
         return M
 
+    def decor(self):
+        # get geometry
+        l, r = self.l, self.r
+        t, b = self.t, self.b
+        # patch
+        R = Rectangle((l, b), r-l, t-b,
+            edgecolor = (0.7, 0.7, 0.7),    # color
+            linestyle = "--",               # line style
+            fill        = False,            # no filling
+            )
+        # done
+        return R
+
 class Document():
 
     def __init__(self, pathname = None):
         if pathname is not None:
-            self._DOC = opendocument(pathname)
+            self._DOC = self.opendocument(pathname)
         return
 
     def opendocument(self, pathname):
@@ -630,13 +644,63 @@ class Document():
 
     def exportfigure(self, name):
         if VERBOSE: print(f"export '{name}'")
-        fg, ax = selectfigure(name)
-        self._DOC.savefig(fg)
+        args = selectfigure(name)
+        self._DOC.savefig(args[0])
         return
 
     def closedocument(self):
         self._DOC.close()
         return
+
+def _getTickPositions(start, stop, ticks):
+
+    def _getTickIntervals(start, stop, ticks):
+
+        ln10 = 2.3025850929940459
+
+        # trial table
+        T = [0.010, 0.020, 0.025, 0.050,
+             0.100, 0.200, 0.250, 0.500,
+             1.000, 2.000, 2.500, 5.000]
+
+        # corresponding tick sub division intervals
+        S = [5.0,   4.0,   5.0,   5.0,
+             5.0,   4.0,   5.0,   5.0,
+             5.0,   4.0,   5.0,   5.0]
+
+        span = stop - start                         # get span
+        d = exp(ln10 * floor(log10(span)))          # find decade
+        span /= d                                   # re-scale
+
+        # find number of tiks below and closest to n
+        i, m = 0, floor(span / T[0])                # start up
+        while m > ticks:                            # next try?
+            i, m = i + 1, floor(span / T[i + 1])    # try again 
+
+        # re-scale
+        mi =  d * T[i]   # main tick intervals
+        si = mi / S[i]   # sub tick intervals
+
+        # done
+        return mi, si
+
+    # get intervals
+    mi, si = _getTickIntervals(start, stop, ticks)
+
+    # main ticks (round is the built-in python version)
+    ns = ceil(start / mi - 0.001) * mi  # start
+    ne = floor(stop / mi + 0.001) * mi  # end
+    p  = round((ne - ns) / mi) + 1      # fail safe
+    M  = linspace(ns, ne, p)            # main positions
+
+    # sub ticks (round is the built-in python version)
+    ns = ceil(start / si + 0.001) * si  # start
+    ne = floor(stop / si - 0.001) * si  # end
+    p  = round((ne - ns) / si) + 1      # fail safe
+    S  = linspace(ns, ne, p)            # sub positions
+
+    # done
+    return M, S
 
 def selectfigure(name):
     if not fignum_exists(name):
@@ -650,58 +714,186 @@ def selectfigure(name):
         ax = fg.add_axes([x, y, w, h])
     else:
         # select figure
+        # (here the figure can be of any type)
         fg = figure(name)
-        # select axes
+        # get axes
         ax = fg.get_axes()[0]
     # done
     return fg, ax
 
+def selectmapfigure(name):
+    # map figure is the same as selectfigure
+    # but adds an extra axis for a side color bar
+    # it also returns an extra axis
+    if not fignum_exists(name): 
+        # create figure
+        fg = figure(name)
+        # set A4 paper dimensions
+        fg.set_size_inches(8.2677, 11.6929)
+        # create square axis
+        w, h, k = [*list(array([1, 1 / 1.4143])*0.7), 0.03]
+        x, y = (1-w-k)/3, (1-h)/2
+        ax = fg.add_axes([x, y, w, h]) 
+        # plus side axis for the color bar 
+        bx = fg.add_axes([x+w+x, y, k, h])
+    else:
+        # select an existing figure
+        # (here the figure has to be a map figure)
+        fg = figure(name)
+        # get axes
+        ax, bx = fg.get_axes()[:2]
+    # done
+    return fg, ax, bx
+
+def showResolution(solver, ax):
+    # get the mesh coordinates
+    X, Y = solver.mesh
+    # show resolution visually
+    nx, ny = solver.nn
+    dx, dy = solver.ll / nx, solver.ll / ny
+    # for i, j in [(0, 0), (0, -1), (-1, 0), (-1, -1)]:
+    for i, j in [(1, 1), (1, -2), (-2, 1), (-2, -2)]:
+        x, y = X[i, j], Y[i, j]
+        l, r, t, b = x-dx/2, x+dx/2, y+dy/2, y-dy/2
+        ax.add_patch(Rectangle((l, b), dx, dy,
+            edgecolor   = "gainsboro",
+            facecolor   = "gainsboro",
+            zorder      = 3,
+            ))
+    # done
+    return
+
+def vplot(solver, figname, mapname, *args, **kwargs):
+    # create/select a map figure
+    fg, ax, bx = selectmapfigure(figname)
+    # get the mesh coordinates
+    X, Y = solver.mesh
+    # get normalised data without the edges
+    D = solver.M[mapname].D[1:-1, 1:-1] / MV
+    # create filled contour map
+    QCS = ax.contourf(X, Y, D, 32, *args, **kwargs)
+    # adjust ticks
+    M, S = _getTickPositions(-0.5, 0.5, 9)
+    ax.set_xticks(M)
+    ax.set_yticks(M)
+    # create the color bar
+    cb = fg.colorbar(QCS, cax = bx)
+    cb.set_ticks(list(arange(0.0, 1.1, 0.1)))
+    # set color map
+    QCS.set_cmap(cm.inferno)
+    # add decors
+    for k in solver.M.keys():
+        ax.add_artist(solver.M[k].M.decor())
+    showResolution(solver, ax)
+    # done
+    return fg, ax, bx
+
+def mplot(solver, figname, mapname):
+    # create/select a map figure
+    fg, ax, bx = selectmapfigure(figname)
+    # get the mesh coordinates
+    X, Y = solver.mesh
+    # get normalised data without the edges
+    D = solver.M[mapname].D[1:-1, 1:-1] / MV
+    # create filled contour map
+    QCS = ax.pcolormesh(X, Y, D, shading = 'auto', rasterized = True)
+    # adjust ticks
+    M, S = _getTickPositions(-0.5, 0.5, 9)
+    ax.set_xticks(M)
+    ax.set_yticks(M)
+    # create the color bar
+    cb = fg.colorbar(QCS, cax = bx)
+    cb.set_ticks(list(arange(0.0, 1.1, 0.1)))
+    # set color map
+    QCS.set_cmap(cm.inferno)
+    # add decors
+    for k in solver.M.keys():
+        ax.add_artist(solver.M[k].M.decor())
+    showResolution(solver, ax)
+    # done
+    return fg, ax, bx
+
+def headerText(text, fg):
+    w, h = array([1, 1 / 1.4143])*0.7
+    x, y = (1-w)/2, (1-h)/2
+    tx = fg.text(x+w/2, 3*y/2+h, text)
+    tx.set_horizontalalignment('center')
+    tx.set_verticalalignment('center')
+    tx.set_fontsize('large')
+    return tx
+
+def footerText(text, fg):
+    w, h = array([1, 1 / 1.4143])*0.7
+    x, y = (1-w)/2, (1-h)/2
+    tx = fg.text(x+w/2, y/2, text)
+    tx.set_horizontalalignment('center')
+    tx.set_verticalalignment('center')
+    tx.set_fontsize('large')
+    return tx
+
 ###############################################################################
 
-D = Document()
-D.opendocument("../local/plot.pdf")
-fg, ax = selectfigure("FIGURE")
+if __name__ == "__main__":
 
-NN = [
-    #     8  16  32   64  128  256  512 1024 2048
-    (3, [20, 20, 20, 100, 100, 200, 200, 200, 200]),
-]
+    from matplotlib.artist import Artist
 
-for p, N in NN:
-    S = SolverTwoDimensions(p)
-    S.addMap("core", DiskSolid(0.1))
-    S.addMap("shield", DiskAperture(0.45))
-    K, R = S.jacobiStepSeries(N)
-    print(f"{K[-1]:6}, {R[-1]*1E12:.3f}")
-    ax.semilogx(K, array(R)*1E12, ".-")
+    D = Document()
+    D.opendocument("../local/plot.pdf")
 
-ax.grid("True")
-# full figure
-D.exportfigure("FIGURE") 
+    w, h, g = 0.3, 0.05, 0.05
 
-# partial plot center on each resolution series
-for x1, x2, y1, y2, tt in [
-    (   1,    50, -5.0, 30.0,    "8 x 8"),
-    (  10,   150, 25.0, 38.0,   "16 x 16"),
-    (  80,   400, 29.0, 38.0,   "32 x 32"),
-    ( 250,   800, 29.0, 33.0,   "64 x 64"),
-    ( 500,  4000, 32.0, 37.0,  "128 x 128"),
-    (2500,  5000, 35.5, 37.0,  "256 x 256"),
-    (3500,  7000, 36.4, 37.0,  "512 x 512"),
-    (5000, 10000, 36.5, 37.0, "1024 x 1024"),
-    (5000, 20000, 36.6, 37.0, "2048 x 2048"),
-    ]:
+    NN = []
+    CC = []
 
-    ax.set_xlim(x1, x2)
-    ax.set_ylim(y1, y2)
-    ax.set_title(tt)
-    D.exportfigure("FIGURE") 
+    sh = 0.0
+    # for sh in arange(0.0, w/2, w/4/16):
+    for r in range(1, 8):    
+        NN.append(
+        ([0.45],                 # shield (radius)
+        [+sh, (+h+g)/2.0, w, h], # top    (x,y,w,h)
+        [-sh, (-h-g)/2.0, w, h], # bottom (x,y,w,h)
+        [100]*r)                 # series (steps, ...)
+        )
 
-D.closedocument()
+    for SH, C1, C2, N in NN:
 
-###############################################################################
-###                     3 SETS OF SELECTED RESULTS                          ###
-###############################################################################
+        S = SolverTwoDimensions(3)
+
+        S.addMap("SH", DiskAperture(*SH)) # shield
+        S.addMap("C1",   PlateSolid(*C1)) # plate 1
+        S.addMap("C2",   PlateSolid(*C2)) # plate 2
+
+        K, R = S.jacobiStepSeries(N, "C1", "C2")
+        CC.append(R[-1])
+
+        fg, ax, bx = vplot(S, "FIGURE", "C1")
+    
+        nx, ny = S.nn
+
+        txt  = f"width = {w}mm\n"
+        txt += f"height = {h}mm\n"
+        txt += f"gap = {g}mm\n"
+        txh = headerText(txt, fg)
+
+        txt  = f"total steps = {K[-1]:6}\n"
+        txt += f"capacity  = {R[-1]*1E12:.3f}pF\n"
+        txf = footerText(txt, fg)
+
+        ax.set_title(f"{nx} X {ny}\n")
+
+        D.exportfigure("FIGURE") 
+        ax.clear()
+
+        Artist.remove(txh)
+        Artist.remove(txf)
+
+    D.closedocument()
+
+#########################################################################
+###                 SETS OF SELECTED RESULTS                          ###
+#########################################################################
+
+
 
 # SET 1 #######################################################################
 
@@ -753,6 +945,10 @@ for x1, x2, y1, y2, tt in [
     (5000, 10000, 36.5, 37.0, "1024 x 1024"),
     (5000, 20000, 36.6, 37.0, "2048 x 2048"),
     ]:
+    ax.set_xlim(x1, x2)
+    ax.set_ylim(y1, y2)
+    ax.set_title(tt)
+    D.exportfigure("FIGURE") 
 
  steps, capacitance
 
@@ -794,6 +990,10 @@ for x1, x2, y1, y2, tt in [
     (5000, 10000, 36.5, 37.0, "1024 x 1024"),
     (5000, 20000, 36.6, 37.0, "2048 x 2048"),
     ]:
+    ax.set_xlim(x1, x2)
+    ax.set_ylim(y1, y2)
+    ax.set_title(tt)
+    D.exportfigure("FIGURE") 
 
     21, 26.128
     40, 33.570
@@ -812,3 +1012,36 @@ only fourteen seconds past one minute!
 "capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries-3.pdf"
 
 """
+
+# SET 4 #######################################################################
+
+"""
+
+NN = [
+    (3, [20]),       #   8
+    (4, [50]),       #   16
+    (5, [250]),      #   32
+    (6, [1000]),     #   64
+    (7, [4000]),     #   128
+    (8, [15000]),    #   256
+    (9, [60000]),    #   512
+    (10, [100000]),  #  1024
+]
+
+    20, 26.131  8
+    50, 33.247  16
+   250, 29.481  32
+   991, 32.644  64
+  4028, 35.708  128
+ 15547, 36.701  256
+ 62793, 36.548  512
+ 99991, 34.802 1024 - clearly not converging yet (see graph)
+
+[Finished in 7567.8s]
+
+Very slow convergence for high resolutions: 5 mins past two hours.
+
+"capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries-4.pdf"
+
+"""
+
