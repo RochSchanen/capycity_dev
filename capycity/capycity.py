@@ -34,9 +34,13 @@ from matplotlib.pyplot import cm
 from matplotlib.backends.backend_pdf import PdfPages
 
 # DATA TYPE
-""" The data type precision is fixed here. Empirically, the algorithm converges
-nicely when using 32 bits unsigned integers. A lower 8 bits unsigned integer
-type can be used when debugging."""
+
+""" The data type precision is fixed here. Empirically, the algorithm
+converges well when using 32 bits unsigned integers. A lower 8 bits
+unsigned integer type is not sufficient but can be used for debugging.
+Select the required length of bits by un-commenting one of following three
+lines: """
+
 # from numpy import uint8  as _DT
 # from numpy import uint16  as _DT
 from numpy import uint32 as _DT
@@ -54,36 +58,43 @@ class SolverTwoDimensions():
         if VERBOSE: print(f"instantiate 'SolverTwoDimensions'")
 
         # LENGTH
+
         """ the length is set for a square shape only so far.
         therefore, just use square grids for the moment. it will
         be extended to two independent lengths later. The issue
         is that the grid ratio and length ratio must be kept
         identical """
+        
         self.ll = 1.0
         if VERBOSE: print(f"length = {self.ll}")
 
         # GRID
+        
         """ the grid size is set for all the maps and masks.
         When the grid resolution is changed, maps and masks
         are upgraded to fit the new grid size. """
+        
         # compute initial size
         if py is None: py = px
         if VERBOSE: print(f"px = {px}, py = {py}")
         nx, ny = 2**px, 2**py
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
-                # locals
+
+        # locals
         self.pp = px, py     # size in power of two
         self.nn = nx, ny     # size in unit cell
 
         self._computemesh()
 
         # MAPS AND MASKS
+
         """ Masks define the geometry of the conducting materials
         that compose the the capacitance to calculate. There is
         one potential field map to compute per conductor/mask. New
         maps are automatically created when new masks are added.
         Masks are build using pre-defined or user-defined methods.
         A single mask can be obtained by merging several mask."""
+        
         self.M = {}
 
         # current step number
@@ -93,11 +104,13 @@ class SolverTwoDimensions():
         return
 
     def addMap(self, name, mask = None):
-        """ create a new map to hold a new component to the capacitance. A CLEAR
-        map and a ANCHOR map are automatically added for the computation. The
-        ANCHOR map should contain the shape of the solid. where the maps is solid
-        the value is VM, otherwise, the value is ZV. A clear map is build from
-        the other maps. """
+
+        """ create a new map to hold a new component to the capacitance.
+        A CLEAR map and a ANCHOR map are automatically added for the
+        computation. The ANCHOR map should contain the shape of the solid.
+        Where the maps is solid, the value is VM, otherwise, the value is ZV.
+        A CLEAR map is build from all the other maps already available. """
+        
         if VERBOSE: print(f"new map '{name.upper()}'")
         # instantiate new map class
         self.M[name] = _map(self.nn)
@@ -139,12 +152,14 @@ class SolverTwoDimensions():
         return
 
     def jacobiSteps(self, n):
+
         """ using the same number of steps on every map is justified if
         the convergence rate depends mostly on the size/resolution of the
-        grid and not so much on the geometry of the system. This should also
-        allow to devise an alternating series of incrementing the
-        resolution followed by a steps series that could be used for all cases.
-        see the next method """
+        grid and not so much on the geometry of the system. This should 
+        also allow to devise an alternating series of incrementing the
+        resolution followed by a steps series that could be used for all
+        cases: see the next method """
+
         for i in range(n):
             # n Jacobi step iterations over every maps
             for k in self.M.keys():
@@ -156,26 +171,29 @@ class SolverTwoDimensions():
 
     def jacobiStepSeries(self, S, C1, C2, n = 100):
 
-        i, a = 0, N[0]
+        """ S is a list of step series numbers. After each step series,
+        the resolution of the grid is incremented by a factor two. This
+        is why the resolution of the grid is always a power of two. C1
+        and C2 are the names of the two conductors for which we compute
+        the mutual capacitance. The other conductors affect the computation
+        only by their presence (geometry) and the value of their potential
+        is kept at zero (See theoretical considerations from the report).
+        At the end of each series, the total number of steps and the value
+        of the capacitance is computed and recorded in list K and R. This
+        allows to monitor the convergence the series. """
 
         if VERBOSE:
             nx, ny = self.nn
             print(f"resolution: {nx}x{ny}")
-
+        i, a = 0, N[0]
         K, R = [], []
-
         # record first point
         K.append(self.k)  
         R.append(self.computeCapacitance(C1, C2))
-
         # compute steps series
         m = ceil(log(sum(S)) / log(10))
         I = diff(logspace(1, m, n, dtype = 'int'))
-
-        # first point
-        R.append(self.computeCapacitance(C1, C2))
-        K.append(self.k)
-
+        # loop through series
         for n in I:
             self.jacobiSteps(n)
             # record new point
@@ -192,15 +210,17 @@ class SolverTwoDimensions():
                 print(f"resolution: {nx}x{ny}")
             K.append(self.k)
             R.append(self.computeCapacitance(C1, C2))
-
         # last point
         K.append(self.k)
         R.append(self.computeCapacitance(C1, C2))
-
         # done 
         return K, R
 
     def computegradient(self, name):
+
+        """ The electric field is directly computed
+        as the gradient of the electric scalar potential """
+        
         nx, ny = self.nn
         # compute interval (intervals should be identical)
         dx, dy = self.ll / nx, self.ll / ny
@@ -217,41 +237,45 @@ class SolverTwoDimensions():
         dx, dy = self.ll / nx, self.ll / ny
         # compute map gradient (electric field)
         self.computegradient(name1)
+        # get component fields
         EX1, EY1 = self.M[name1].dD
         self.computegradient(name2)
+        # get component fields
         EX2, EY2 = self.M[name2].dD
-        # compute dor products
+        # compute 'field' dot products
         integrand = MLT(EX1, EX2) + MLT(EY1, EY2)
         # compute numeric integral
         integral = SUM(integrand)*dx*dy
-        # normalise capacitance 
-        CN = -integral*EPS0
+        # normalise units and return the mutual
+        # capacitance as a positive value
+        C = -integral*EPS0
         # done
-        return CN
+        return C
 
     def incrementResolution(self):
-        """ increase the resolution by a factor two. One can notice that
-        with large resolution, the Jacobi iteration "propagates" the potential
-        "wave" at a slower "velocity". At lower resolutions the convergence 
-        to a solution is quicker. In order to benefit from that fact, an  """
+
+        """ increase the resolution by a factor two. It can be noticed
+        empirically that with larger resolution, the Jacobi iteration
+        "propagates" the scalar potential "wave" at a slower "velocity".
+        At lower resolutions the convergence to an approximate solution
+        is quicker. In order to benefit from that observation, a gradual
+        incrementation of the resolution is performed. The convergence
+        to an accurate solution is preserved without compromising to much
+        the computing time. """
 
         if VERBOSE: print("<-", end = "")
-
         # get current values
         px, py = self.pp
-
         # update values
         px, py = px + 1, py + 1
         nx, ny = 2**px, 2**py
-
         # update local parameters
         self.pp = px, py
         self.nn = nx, ny
-
+        # debug
         if VERBOSE: print("map.D-", end = "")
-
+        # loop through maps
         for k in self.M.keys():
-
             # save current data for the upgrade
             D = copy(self.M[k].D[1:-1, 1:-1])
             """ edges are ignored. """
@@ -260,65 +284,71 @@ class SolverTwoDimensions():
             """ the new data set is initialised to zeros.
             This is clearing up the edges. The rest of the
             array is defined during the "quadruplication """
-
             if VERBOSE: print("quad-", end = "")
-
             # quadruplicate the data set
             self.M[k].D[1:-1:2, 1:-1:2] = D
             self.M[k].D[2:-1:2, 1:-1:2] = D
             self.M[k].D[1:-1:2, 2:-1:2] = D
             self.M[k].D[2:-1:2, 2:-1:2] = D
-
+        # debug
         if VERBOSE: print("map.A-", end = "")
-
+        # loop through maps
         for k in self.M.keys():
             # re-build ANCHOR mask
             self.M[k].refreshMask(self.nn, self.ll)
-
+        # debug
         if VERBOSE: print("map.C-", end = "")
-
+        # loop through maps
         for k in self.M.keys():
             # reserve memory for the CLEAR mask
             self.M[k].C = full([nx+2, ny+2], MV, _DT)
-            # merge inverse of all other maps
+            # loop though all the other maps
             for l in self.M.keys():
                 if k == l: continue
+                # merge masks
                 self.M[k].C &= invert(self.M[l].A)
-
+        # debug
         if VERBOSE: print("mesh-", end = "")
-
         # re-compute mesh
         self._computemesh()
-
+        # debug
         if VERBOSE: print(">")
-
         # done
         return
 
 class _map():
 
     def __init__(self, nn):
-        if VERBOSE: print(f"instanciate '_map'")
+        if VERBOSE: print(f"instantiate '_map'")
         # get grid size
         nx, ny = nn
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
-        # new maps
-        self.D = full([nx+2, ny+2], ZV, _DT) # DATA MAP (BETWEEN COMPONENTS)
-        self.C = full([nx+2, ny+2], MV, _DT) # CLEAR MAP (OTHER COMPONENTS)
-        self.A = full([nx+2, ny+2], ZV, _DT) # ANCHOR MAP (THIS COMPONENT)
+        # new data map (potential between conductors)
+        self.D = full([nx+2, ny+2], ZV, _DT)
+        # clear map (zero potential from other conductors)
+        self.C = full([nx+2, ny+2], MV, _DT)
+        # anchor map (unit potential from this conductor)
+        self.A = full([nx+2, ny+2], ZV, _DT)
+        # debug
         if VERBOSE_MAP: print(f"map:")
         if VERBOSE_MAP: print(f"{self.D}")
-        # masks
+        # declare masks list
         self.M = None
-        # gradients
+        # declare gradients list
         self.dD = None
         # done
         return
 
-    """ maybe the two next methods can be merged... or made independent... """
+    """ maybe the two next
+    methods can be merged...
+    or made independent... """
 
-    """ This adds a new solid shape that is registered a merged to the existing
-    ANCHOR map.There is only one mask for the moment. """
+    """ This adds a new solid shape
+    that is registered by merging it
+    to the existing ANCHOR map. There
+    is only one mask implemented for
+    the moment.
+    """
     def setMask(self, mask, nn, ll):
         # register the class instance
         self.M = mask
@@ -327,8 +357,11 @@ class _map():
         # done
         return
 
-    """ when there is more than one function to build the mask, a set of masks
-    must be merged together. This is done by refreshMask() """
+    """ when there is more than one
+    function to build the mask, a set
+    of masks that must be merged together.
+    This is done through refreshMask()
+    """
     def refreshMask(self, nn, ll):
         
         # go through all map building function HERE!
@@ -338,13 +371,14 @@ class _map():
         # use the registered mask methods
         # self.A |= self.M.mask(nn, ll)
         self.A = self.M.mask(nn, ll)
-        
+        # debug        
         if VERBOSE_MAP: print(f"anchor map:")
         if VERBOSE_MAP: print(f"{self.A}:")
         # done
         return
 
     def applyMasks(self):
+
         """ The resetting of the boundary conditions is
         performed by using two simple bitwise logical
         operations: "OR" and "AND" """
@@ -384,7 +418,7 @@ class _map():
         issue. maybe we should lower the MAX value
         by 1/4 to associate the shift operations
         into a single one while preventing overflow.
-        To do: investigate on that lamda factor to
+        To do: investigate on that lambda factor to
         overshoot the Jacobi step and maybe converge
         substantially faster. """
         
