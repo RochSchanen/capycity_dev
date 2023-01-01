@@ -51,7 +51,7 @@ VERBOSE = False
 class SolverTwoDimensions():
 
     def __init__(self, px = 3, py = None):
-        if VERBOSE: print(f"instanciate 'SolverTwoDimensions'")
+        if VERBOSE: print(f"instantiate 'SolverTwoDimensions'")
 
         # LENGTH
         """ the length is set for a square shape only so far.
@@ -66,7 +66,7 @@ class SolverTwoDimensions():
         """ the grid size is set for all the maps and masks.
         When the grid resolution is changed, maps and masks
         are upgraded to fit the new grid size. """
-        # compute intial size
+        # compute initial size
         if py is None: py = px
         if VERBOSE: print(f"px = {px}, py = {py}")
         nx, ny = 2**px, 2**py
@@ -99,7 +99,7 @@ class SolverTwoDimensions():
         the value is VM, otherwise, the value is ZV. A clear map is build from
         the other maps. """
         if VERBOSE: print(f"new map '{name.upper()}'")
-        # instanciate new map class
+        # instantiate new map class
         self.M[name] = _map(self.nn)
         # build CLEAR mask
         for k in self.M.keys():
@@ -139,15 +139,17 @@ class SolverTwoDimensions():
         return
 
     def jacobiSteps(self, n):
-        # n jacobi step iterations over every maps
+        """ using the same number of steps on every map is justified if
+        the convergence rate depends mostly on the size/resolution of the
+        grid and not so much on the geometry of the system. This should also
+        allow to devise an alternating series of incrementing the
+        resolution followed by a steps series that could be used for all cases.
+        see the next method """
         for i in range(n):
+            # n Jacobi step iterations over every maps
             for k in self.M.keys():
                 self.M[k].jacobiStep()
-        """ this approach is justified if convegence rate mostly depends on
-        the size of the grid and not the gemometry of the system. This should
-        allow to devise a fixed 'step-increment' series to be used for all
-        cases """
-        # incremenb step counter
+        # increment step counter
         self.k += n
         # done
         return
@@ -200,7 +202,7 @@ class SolverTwoDimensions():
 
     def computegradient(self, name):
         nx, ny = self.nn
-        # compute interval (intervals shoud be identical)
+        # compute interval (intervals should be identical)
         dx, dy = self.ll / nx, self.ll / ny
         # compute gradient without edges
         dDy, dDx = gradient(self.M[name].D[1:-1, 1:-1] / MV)
@@ -211,7 +213,7 @@ class SolverTwoDimensions():
 
     def computeCapacitance(self, name1, name2):
         nx, ny = self.nn
-        # compute interval (intervals shoud be identical)
+        # compute interval (intervals should be identical)
         dx, dy = self.ll / nx, self.ll / ny
         # compute map gradient (electric field)
         self.computegradient(name1)
@@ -229,7 +231,7 @@ class SolverTwoDimensions():
 
     def incrementResolution(self):
         """ increase the resolution by a factor two. One can notice that
-        with large resolution, the jacobi iteration "propagates" the potential
+        with large resolution, the Jacobi iteration "propagates" the potential
         "wave" at a slower "velocity". At lower resolutions the convergence 
         to a solution is quicker. In order to benefit from that fact, an  """
 
@@ -354,7 +356,7 @@ class _map():
         to the data array using the currently defined "clear" mask.
         Mask regions with the MAX value leave the data unchanged,
         while mask regions with the ZER value will force the data
-        to "ZER". A logical AND instead of a product is prefered
+        to "ZER". A logical AND instead of a product is preferred
         for speed. """
 
         # apply the set mask
@@ -364,7 +366,7 @@ class _map():
         to the data array using the currently defined "set" mask.
         Mask regions with the ZER value leave the data unchanged,
         while mask regions with the MAX value will force the data
-        to "MAX". A logical OR instead of a product is prefered
+        to "MAX". A logical OR instead of a product is preferred
         for speed. """
         
         # done
@@ -451,7 +453,7 @@ class DiskSolid():
         c = Circle(
             (0.0, 0.0),                     # origin
             self.r,                         # size
-            edgecolor = (0.7, 0.7, 0.7),    # color
+            edgecolor = (0.7, 0.7, 0.7),    # colour
             linestyle = "--",               # line style
             fill = False,                   # fill style
             )
@@ -463,7 +465,7 @@ class DiskAperture():
     # parameters
     def __init__(self, r):
 
-        if VERBOSE: print("instanciate 'DiskAperture'")
+        if VERBOSE: print("instantiate 'DiskAperture'")
 
         # record parameters
         self.l, self.r = -r, +r
@@ -508,7 +510,7 @@ class DiskAperture():
         c = Circle(
             (0.0, 0.0),                     # origin
             self.r,                         # size
-            edgecolor = (0.7, 0.7, 0.7),    # color
+            edgecolor = (0.7, 0.7, 0.7),    # colour
             linestyle = "--",               # line style
             fill = False,                   # fill style
             )
@@ -520,7 +522,7 @@ class PlateSolid():
     # parameters
     def __init__(self, x, y, w, h):
 
-        if VERBOSE: print("instanciate 'PlateSolid'")
+        if VERBOSE: print("instantiate 'PlateSolid'")
 
         # record parameters
         self.l, self.r = x - w / 2.0, x + w / 2.0
@@ -566,7 +568,7 @@ class PlateSolid():
         t, b = self.t, self.b
         # patch
         R = Rectangle((l, b), r-l, t-b,
-            edgecolor = (0.7, 0.7, 0.7),    # color
+            edgecolor = (0.7, 0.7, 0.7),    # colour
             linestyle = "--",               # line style
             fill        = False,            # no filling
             )
@@ -578,7 +580,7 @@ class PlateAperture():
     # parameters
     def __init__(self, x, y, w, h):
 
-        if VERBOSE: print("instanciate 'PlateAperture'")
+        if VERBOSE: print("instantiate 'PlateAperture'")
 
         # record parameters
         self.l, self.r = x - w / 2.0, x + w / 2.0
@@ -624,7 +626,7 @@ class PlateAperture():
         t, b = self.t, self.b
         # patch
         R = Rectangle((l, b), r-l, t-b,
-            edgecolor = (0.7, 0.7, 0.7),    # color
+            edgecolor = (0.7, 0.7, 0.7),    # colour
             linestyle = "--",               # line style
             fill        = False,            # no filling
             )
@@ -672,7 +674,7 @@ def _getTickPositions(start, stop, ticks):
         d = exp(ln10 * floor(log10(span)))          # find decade
         span /= d                                   # re-scale
 
-        # find number of tiks below and closest to n
+        # find number of ticks below and closest to n
         i, m = 0, floor(span / T[0])                # start up
         while m > ticks:                            # next try?
             i, m = i + 1, floor(span / T[i + 1])    # try again 
@@ -723,7 +725,7 @@ def selectfigure(name):
 
 def selectmapfigure(name):
     # map figure is the same as selectfigure
-    # but adds an extra axis for a side color bar
+    # but adds an extra axis for a side colour bar
     # it also returns an extra axis
     if not fignum_exists(name): 
         # create figure
@@ -734,7 +736,7 @@ def selectmapfigure(name):
         w, h, k = [*list(array([1, 1 / 1.4143])*0.7), 0.03]
         x, y = (1-w-k)/3, (1-h)/2
         ax = fg.add_axes([x, y, w, h]) 
-        # plus side axis for the color bar 
+        # plus side axis for the colour bar 
         bx = fg.add_axes([x+w+x, y, k, h])
     else:
         # select an existing figure
@@ -776,10 +778,10 @@ def vplot(solver, figname, mapname, *args, **kwargs):
     M, S = _getTickPositions(-0.5, 0.5, 9)
     ax.set_xticks(M)
     ax.set_yticks(M)
-    # create the color bar
+    # create the colour bar
     cb = fg.colorbar(QCS, cax = bx)
     cb.set_ticks(list(arange(0.0, 1.1, 0.1)))
-    # set color map
+    # set colour map
     QCS.set_cmap(cm.inferno)
     # add decors
     for k in solver.M.keys():
@@ -801,10 +803,10 @@ def mplot(solver, figname, mapname):
     M, S = _getTickPositions(-0.5, 0.5, 9)
     ax.set_xticks(M)
     ax.set_yticks(M)
-    # create the color bar
+    # create the colour bar
     cb = fg.colorbar(QCS, cax = bx)
     cb.set_ticks(list(arange(0.0, 1.1, 0.1)))
-    # set color map
+    # set colour map
     QCS.set_cmap(cm.inferno)
     # add decors
     for k in solver.M.keys():
@@ -921,7 +923,7 @@ NN = [
   5327, 37.016  37.0
   9991, 36.981  37.0
 
-"capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries.pdf"
+"capycity_dev/outputs/CoaxialCapacitorConvergenceSeries.pdf"
 
 """
 
@@ -966,7 +968,7 @@ for x1, x2, y1, y2, tt in [
 
 One minute past an hour: mostly the last series: 2048x2048: 10000 points
 
-"capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries-2.pdf"
+"capycity_dev/outputs/CoaxialCapacitorConvergenceSeries-2.pdf"
 
 """
 
@@ -1009,7 +1011,7 @@ for x1, x2, y1, y2, tt in [
 
 only fourteen seconds past one minute!
 
-"capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries-3.pdf"
+"capycity_dev/outputs/CoaxialCapacitorConvergenceSeries-3.pdf"
 
 """
 
@@ -1041,7 +1043,6 @@ NN = [
 
 Very slow convergence for high resolutions: 5 mins past two hours.
 
-"capycity_dev/ouputs/CoaxialCapacitorConvergenceSeries-4.pdf"
+"capycity_dev/outputs/CoaxialCapacitorConvergenceSeries-4.pdf"
 
 """
-
