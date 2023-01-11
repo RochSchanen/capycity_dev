@@ -185,7 +185,8 @@ class SolverTwoDimensions():
         if VERBOSE:
             nx, ny = self.nn
             print(f"resolution: {nx}x{ny}")
-        i, a = 0, N[0]
+
+        i, a = 0, S[0]
         K, R = [], []
         # record first point
         K.append(self.k)  
@@ -201,9 +202,9 @@ class SolverTwoDimensions():
             R.append(self.computeCapacitance(C1, C2))
             # check if new resolution triggered
             if self.k < a: continue
-            if i+1 == len(N): break
+            if i+1 == len(S): break
             if VERBOSE: print(f"{K[-1]:6}, {R[-1]*1E12:.3f}")
-            i, a = i+1, a + N[i+1]
+            i, a = i+1, a + S[i+1]
             self.incrementResolution()
             if VERBOSE:
                 nx, ny = self.nn
