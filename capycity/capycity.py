@@ -810,7 +810,7 @@ def vplot(solver, figname, mapname, *args, **kwargs):
     # create filled contour map
     QCS = ax.contourf(X, Y, D, 32, *args, **kwargs)
     # adjust ticks
-    M, S = _getTickPositions(-0.5, 0.5, 9)
+    M, S = _getTickPositions(-solver.ll/2.0, +solver.ll/2.0, 9)
     ax.set_xticks(M)
     ax.set_yticks(M)
     # create the colour bar
@@ -835,7 +835,7 @@ def mplot(solver, figname, mapname):
     # create filled contour map
     QCS = ax.pcolormesh(X, Y, D, shading = 'auto', rasterized = True)
     # adjust ticks
-    M, S = _getTickPositions(-0.5, 0.5, 9)
+    M, S = _getTickPositions(-solver.ll/2.0, +solver.ll/2.0, 9)
     ax.set_xticks(M)
     ax.set_yticks(M)
     # create the colour bar
@@ -854,6 +854,7 @@ def headerText(text, fg):
     w, h = array([1, 1 / 1.4143])*0.7
     x, y = (1-w)/2, (1-h)/2
     tx = fg.text(x+w/2, 3*y/2+h, text)
+    tx.set_fontfamily('monospace')
     tx.set_horizontalalignment('center')
     tx.set_verticalalignment('center')
     tx.set_fontsize('large')
@@ -863,6 +864,7 @@ def footerText(text, fg):
     w, h = array([1, 1 / 1.4143])*0.7
     x, y = (1-w)/2, (1-h)/2
     tx = fg.text(x+w/2, y/2, text)
+    tx.set_fontfamily('monospace')
     tx.set_horizontalalignment('center')
     tx.set_verticalalignment('center')
     tx.set_fontsize('large')
@@ -925,6 +927,8 @@ if __name__ == "__main__":
         Artist.remove(txf)
 
     D.closedocument()
+
+
 
 #########################################################################
 ###                 SETS OF SELECTED RESULTS                          ###
