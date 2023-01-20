@@ -284,7 +284,7 @@ class SolverTwoDimensions():
             self.M[k].D = full([nx+2, ny+2], ZV, _DT)
             """ the new data set is initialised to zeros.
             This is clearing up the edges. The rest of the
-            array is defined during the "quadruplication """
+            array is defined during the 'quadruplication' """
             if VERBOSE: print("quad-", end = "")
             # quadruplicate the data set
             self.M[k].D[1:-1:2, 1:-1:2] = D
