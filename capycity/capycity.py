@@ -145,7 +145,8 @@ class SolverTwoDimensions():
         # limits
         lx, ly = (self.ll - dx) / 2.0, (self.ll - dy) / 2.0
         # domains
-        Dx, Dy = arange(-lx, +lx + dx, dx), arange(-ly, +ly + dy, dy)
+        # Dx, Dy = arange(-lx, +lx + dx, dx), arange(-ly, +ly + dy, dy)
+        Dx, Dy = linspace(-lx, +lx, nx), linspace(-ly, +ly, ny)
         # mesh
         self.mesh = meshgrid(Dx, Dy)
         # done
@@ -435,7 +436,7 @@ class _map():
         # reset boundaries
         self.applyMasks()
 
-        # done`
+        # done
         return
 
 class DiskSolid():
