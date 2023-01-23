@@ -1,0 +1,10 @@
+# .gitignore
+.gitattributes
+
+local/*
+obsolete/*
+documents/*
+# outputs/*
+
+*.pyc
+*.npy
