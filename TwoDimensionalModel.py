@@ -15,7 +15,7 @@ from numpy import linspace
 from numpy import array
 from numpy import append
 
-SKIP_NUMERICS, SKIP_RESULTS = True, False
+SKIP_NUMERICS, SKIP_RESULTS = False, False
 
 # width, height, gap, excentricity, shield radius
 w, h, g, e, r = 8.400E-3, 1.500E-3, 1.000E-3, 0.000E-3, 50.000E-3
@@ -29,12 +29,12 @@ if not SKIP_NUMERICS:
     PSS, CC, XX = [], [], []
 
     # build phase space section
-    for g in linspace(0.300E-3, 3.000E-3, 25):
+    for g in linspace(0.300E-3, 1.200E-3, 10):
         PSS.append(
             ([r],                   # shield (radius)
             [+e, (+h+g)/2.0, w, h], # top    (x,y,w,h)
             [-e, (-h-g)/2.0, w, h], # bottom (x,y,w,h)
-            [100]*10)                # series (steps, ...)
+            [100]*11)               # series (steps, ...)
         )
 
     # run through parameters:
