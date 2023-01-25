@@ -182,6 +182,14 @@ class SolverTwoDimensions():
         # done
         return
 
+    def jacobiStep(self, C):
+        """ run through the sevral maps that belong to the
+        conductor C and evaluate the jacobi step for each after
+        setting up the boundary conditions. change M to MM: single
+        map to multiple maps (one of each resolution).
+        """        
+        return
+
     def jacobiSteps(self, n, C1, C2, SavePattern = None):
         """ using the same number of steps on every map is justified
         if the convergence rate depends mostly on the size/resolution
@@ -192,8 +200,8 @@ class SolverTwoDimensions():
         K, C = [], []
         for i in range(n):
             # n Jacobi step iterations over C1 and C2
-            self.M[C1].jacobiStep()
-            self.M[C2].jacobiStep()
+            self.M[C1].jacobiStep() # change to self.jacobiStep(C1)
+            self.M[C2].jacobiStep() # change to self.jacobiStep(C2)
             # save if step match pattern element
             if (self.k+i) in SavePattern:
                 K.append(self.k+i)
@@ -368,6 +376,26 @@ class SolverTwoDimensions():
 
 class _map():
 
+    """
+        I need to add a method that allows to vary the values at the 
+        boundary that comes from the other maps that have different
+        resolutions. This boundaries are set at the level of the
+        JacobiSteps method. The boundary are centered about the
+        center of the map. For all maps, the outer boundary can be
+        set or left at zero (intial setup). For all maps but the
+        center map (highest resolution), another set of bondaries
+        can be imposed.
+    """
+
+    def getboundary(self):
+        """ the boundaries are automatically centered """
+        l, r, t, b = None, None, None, None
+        return l, r, t, b
+
+    def setboundary(self, l, r, t, b):
+        """ the boundaries are automatically centered """
+        return        
+
     def __init__(self, nn):
         if VERBOSE: print(f"instantiate '_map'")
         # get grid size
@@ -457,6 +485,7 @@ class _map():
         return
 
     def jacobiStep(self):
+        
         """ operations a performed directly on arrays
         which should reduces the time of execution.
         four array copies are fast operations. The
@@ -471,7 +500,23 @@ class _map():
         To do: investigate on that lambda factor to
         overshoot the Jacobi step and maybe converge
         substantially faster. """
+
+        """
+        Also, the algorithm of Guauss-Seidel could be
+        implemented instead (explicit loop). However,
+        this requires an implementation in cpython or
+        some pre-compilation with optimisation.
+        """        
         
+        """
+        Another thing. It may be worth invertigate the
+        use of the graphic card ability of processing
+        these operations very fast: like operation on
+        images. All the computation are linear and most
+        likely can be handled very fast by a graphics
+        card.
+        """
+
         # compute shifted arrays
         l = copy(self.D[+1:-1, 0:-2]) # left
         r = copy(self.D[+1:-1, 2:  ]) # right
@@ -480,6 +525,13 @@ class _map():
 
         # compute average (Jacobi step)
         self.D[1:-1, 1:-1] = l//4 + r//4 + t//4 + b//4
+        """ should be able to reduce the number of divisions
+        by summing first and dividing (double shifting) only
+        once after. However, be aware of the possible overflow
+        of our unsigned interger type. This could work if we
+        divided MV by a factor four. That would prevent a
+        possible overflow: the idea needs to be tested.
+        """
 
         # reset boundaries
         self.applyMasks()
@@ -935,9 +987,10 @@ def footerText(text, fg):
 ###############################################################################
 
 SELECT = [
-    "CONVERGENCE",  # 0
-    "COMPARISON",   # 1
-    ][0]
+    "SERIES-CONVERGENCE",  # 0
+    "SERIES-COMPARISON",   # 1
+    "MULTI-GRID",          # 2
+    ][2]
 
 if __name__ == "__main__":
 
@@ -1095,3 +1148,8 @@ if __name__ == "__main__":
         D.exportfigure("RESULTS2") 
 
         D.closedocument()
+
+
+    if SELECT == "MULTI-GRID":
+
+        print("...")
