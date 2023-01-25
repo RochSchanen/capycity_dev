@@ -1,4 +1,34 @@
 
+# VERSION
+version = 0.01
+"""
+    - remove the powers of two constrain.
+    - keep the square shape
+
+    improve:
+
+        - use diff instead of gradient to prevent usage of float
+        and keep the use of integers to accelerate calculations and
+        prevent from using too much memory (see also multi grid).
+
+        - decrease the maximum value by a factor 4. Sum the arrays
+            first and then divide (double shift) the sum by fouronly
+            once instead of four times as it is implemented now.
+
+    next steps:
+
+        - implement multi grid:
+            keep the square shape. use concentric increase of the
+            resolution with a list of concentric sizes: it is a
+            re-implementation of the JacobiStepSeries where the size
+            of the higher resolution map is redefined as a subset of
+            the original map. The outer coarser map works where the
+            potential gradients are small (towards the edges with a
+            shield of large size).
+        
+        - allow rectangular shape
+"""
+
 # LIBRARIES
 
 # from package: "https://numpy.org/"
@@ -37,9 +67,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 """ The data type precision is fixed here. Empirically, the algorithm
 converges well when using 32 bits unsigned integers. A lower 8 bits
-unsigned integer type is not sufficient but can be used for debugging.
-Select the required length of bits by un-commenting one of following three
-lines: """
+unsigned integer type is not sufficient but can be used for
+debugging. Select the required length of bits by un-commenting one of
+following three lines: """
 
 # from numpy import uint8  as _DT
 # from numpy import uint16  as _DT
@@ -54,19 +84,9 @@ VERBOSE = False
 
 class SolverTwoDimensions():
 
-    def __init__(self, px = 3, py = None):
+    def __init__(self, nx = 8, ny = None, lx = 1.0, ly = None):
+
         if VERBOSE: print(f"instantiate 'SolverTwoDimensions'")
-
-        # LENGTH
-
-        """ the length is set for a square shape only so far.
-        therefore, just use square grids for the moment. it will
-        be extended to two independent lengths later. The issue
-        is that the grid ratio and length ratio must be kept
-        identical """
-        
-        self.ll = 1.0
-        if VERBOSE: print(f"length = {self.ll}")
 
         # GRID
         
@@ -75,14 +95,23 @@ class SolverTwoDimensions():
         are upgraded to fit the new grid size. """
         
         # compute initial size
-        if py is None: py = px
-        if VERBOSE: print(f"px = {px}, py = {py}")
-        nx, ny = 2**px, 2**py
+        if ny is None: ny = nx
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
 
-        # locals
-        self.pp = px, py     # size in power of two
-        self.nn = nx, ny     # size in unit cell
+        # LENGTH
+
+        """ the length is set for a square shape only so far.
+        therefore, just use square grids for the moment. it will
+        be extended to two independent lengths later. The issue
+        is that the grid size and length ratio must be kept
+        identical """
+
+        if ly is None: ly = ny*lx/nx
+        if VERBOSE: print(f"lx = {lx}, ly = {ly}")
+
+        # local
+        self.ll = lx, ly    # grid length
+        self.nn = nx, ny    # grid size
 
         self._computemesh()
 
@@ -105,11 +134,12 @@ class SolverTwoDimensions():
 
     def addMap(self, name, mask = None):
 
-        """ create a new map to hold a new component to the capacitance.
-        A CLEAR map and a ANCHOR map are automatically added for the
-        computation. The ANCHOR map should contain the shape of the solid.
-        Where the maps is solid, the value is VM, otherwise, the value is ZV.
-        A CLEAR map is build from all the other maps already available. """
+        """ create a new map to hold a new component to the
+        capacitance. A CLEAR map and a ANCHOR map are automatically
+        added for the computation. The ANCHOR map should contain
+        the shape of the solid. Where the maps is solid, the value is
+        VM, otherwise, the value is ZV. A CLEAR map is build from all
+        the other maps already available. """
         
         if VERBOSE: print(f"new map '{name.upper()}'")
         # instantiate new map class
@@ -140,92 +170,94 @@ class SolverTwoDimensions():
 
     def _computemesh(self):
         nx, ny = self.nn
-        # intervals (intervals should be identical)
-        dx, dy = self.ll / nx, self.ll / ny
-        # limits
-        lx, ly = (self.ll - dx) / 2.0, (self.ll - dy) / 2.0
+        lx, ly = self.ll
+        # intervals
+        dx, dy = lx / nx, ly / ny
+        # boundaries
+        bx, by = (lx - dx) / 2.0, (ly - dy) / 2.0
         # domains
-        # Dx, Dy = arange(-lx, +lx + dx, dx), arange(-ly, +ly + dy, dy)
-        Dx, Dy = linspace(-lx, +lx, nx), linspace(-ly, +ly, ny)
+        Dx, Dy = linspace(-bx, +bx, nx), linspace(-by, +by, ny)
         # mesh
         self.mesh = meshgrid(Dx, Dy)
         # done
         return
 
-    def jacobiSteps(self, n):
-
-        """ using the same number of steps on every map is justified if
-        the convergence rate depends mostly on the size/resolution of the
-        grid and not so much on the geometry of the system. This should 
-        also allow to devise an alternating series of incrementing the
-        resolution followed by a steps series that could be used for all
-        cases: see the next method """
-
+    def jacobiSteps(self, n, C1, C2, SavePattern = None):
+        """ using the same number of steps on every map is justified
+        if the convergence rate depends mostly on the size/resolution
+        of the grid and not so much on the geometry of the system.
+        This should also allow to devise an alternating series of
+        incrementing the resolution followed by a steps series that
+        could be used for all cases: see the next method """
+        K, C = [], []
         for i in range(n):
-            # n Jacobi step iterations over every maps
-            for k in self.M.keys():
-                self.M[k].jacobiStep()
+            # n Jacobi step iterations over C1 and C2
+            self.M[C1].jacobiStep()
+            self.M[C2].jacobiStep()
+            # save if step match pattern element
+            if (self.k+i) in SavePattern:
+                K.append(self.k+i)
+                C.append(self.computeCapacitance(C1, C2))
         # increment step counter
         self.k += n
-        # done
-        return
+        # return a single value
+        if SavePattern is None:
+            return self.computeCapacitance(C1, C2)
+        # return saved data
+        return K, C
 
-    def jacobiStepSeries(self, S, C1, C2, n = 100):
-
-        """ S is a list of step series numbers. After each step series,
-        the resolution of the grid is incremented by a factor two. This
-        is why the resolution of the grid is always a power of two. C1
-        and C2 are the names of the two conductors for which we compute
-        the mutual capacitance. The other conductors affect the computation
-        only by their presence (geometry) and the value of their potential
-        is kept at zero (See theoretical considerations from the report).
-        At the end of each series, the total number of steps and the value
-        of the capacitance is computed and recorded in list K and R. This
-        allows to monitor the convergence the series. """
-
+    def jacobiStepSeries(self, S, C1, C2, n = 500):
+        """ S is a list of step series numbers. After each step
+        series, the resolution of the grid is incremented by a factor
+        two. This is why the resolution of the grid is always a power
+        of two. C1 and C2 are the names of the two conductors for
+        which we compute the mutual capacitance. The other conductors
+        affect the computation only by their presence (geometry) and
+        the value of their potential is kept at zero (See theoretical
+        considerations from the report). At the end of each series,
+        the total number of steps and the value of the capacitance is
+        computed and recorded in list K and R. This allows to monitor
+        the convergence the series. """
         if VERBOSE:
             nx, ny = self.nn
             print(f"resolution: {nx}x{ny}")
-
-        i, a = 0, S[0]
-        K, R = [], []
-        # record first point
-        K.append(self.k)  
-        R.append(self.computeCapacitance(C1, C2))
-        # compute steps series
-        m = ceil(log(sum(S)) / log(10))
-        I = diff(logspace(1, m, n, dtype = 'int'))
+        # compute saving pattern (logarithmic spacing)
+        decade = ceil(log(sum(S)) / log(10))
+        P = list(logspace(0, decade, n, dtype = 'int'))
+        # make sure the last step is recorded
+        P.append(sum(S))
+        # declare lists
+        K = []  # steps
+        C = []  # capacitances
         # loop through series
-        for n in I:
-            self.jacobiSteps(n)
-            # record new point
-            K.append(self.k)  
-            R.append(self.computeCapacitance(C1, C2))
-            # check if new resolution triggered
-            if self.k < a: continue
-            if i+1 == len(S): break
-            if VERBOSE: print(f"{K[-1]:6}, {R[-1]*1E12:.3f}")
-            i, a = i+1, a + S[i+1]
+        for n in S[:-1]:
+            # compute steps series
+            k, c = self.jacobiSteps(n, C1, C2, P)
+            # append data points
+            K += k; C += c
+            # increment resolution
             self.incrementResolution()
             if VERBOSE:
                 nx, ny = self.nn
                 print(f"resolution: {nx}x{ny}")
-            K.append(self.k)
-            R.append(self.computeCapacitance(C1, C2))
-        # last point
-        K.append(self.k)
-        R.append(self.computeCapacitance(C1, C2))
+            # add first point after resolution increment
+            K += [self.k]
+            C += [self.computeCapacitance(C1, C2)]
+            self.k += 1
+        # compute last steps series
+        k, c = self.jacobiSteps(S[-1], C1, C2, P)
+        # append last data points
+        K += k; C += c
         # done 
-        return K, R
+        return K, C
 
     def computegradient(self, name):
-
         """ The electric field is directly computed
         as the gradient of the electric scalar potential """
-        
         nx, ny = self.nn
-        # compute interval (intervals should be identical)
-        dx, dy = self.ll / nx, self.ll / ny
+        lx, ly = self.ll
+        # compute intervals
+        dx, dy = lx / nx, ly / ny
         # compute gradient without edges
         dDy, dDx = gradient(self.M[name].D[1:-1, 1:-1] / MV)
         # fix units and record gradient without edges
@@ -235,24 +267,26 @@ class SolverTwoDimensions():
 
     def computeCapacitance(self, name1, name2):
         nx, ny = self.nn
+        lx, ly = self.ll
         # compute interval (intervals should be identical)
-        dx, dy = self.ll / nx, self.ll / ny
-        # compute map gradient (electric field)
+        dx, dy = lx / nx, ly / ny
+        # compute C1 map gradient (electric field)
         self.computegradient(name1)
         # get component fields
         EX1, EY1 = self.M[name1].dD
+        # compute C2 map gradient (electric field)
         self.computegradient(name2)
         # get component fields
         EX2, EY2 = self.M[name2].dD
-        # compute 'field' dot products
+        # compute 'field dot products'
         integrand = MLT(EX1, EX2) + MLT(EY1, EY2)
         # compute numeric integral
         integral = SUM(integrand)*dx*dy
         # normalise units and return the mutual
         # capacitance as a positive value
-        C = -integral*EPS0
+        c = -integral*EPS0
         # done
-        return C
+        return c
 
     def incrementResolution(self):
 
@@ -266,40 +300,50 @@ class SolverTwoDimensions():
         the computing time. """
 
         if VERBOSE: print("<-", end = "")
+
         # get current values
-        px, py = self.pp
+        nx, ny = self.nn        
+
+        # update local
+        nx, ny = nx<<1, ny<<1
+
         # update values
-        px, py = px + 1, py + 1
-        nx, ny = 2**px, 2**py
-        # update local parameters
-        self.pp = px, py
         self.nn = nx, ny
+
         # debug
         if VERBOSE: print("map.D-", end = "")
+
         # loop through maps
         for k in self.M.keys():
+
             # save current data for the upgrade
             D = copy(self.M[k].D[1:-1, 1:-1])
             """ edges are ignored. """
+
             # reserve memory for the new data set
             self.M[k].D = full([nx+2, ny+2], ZV, _DT)
             """ the new data set is initialised to zeros.
             This is clearing up the edges. The rest of the
             array is defined during the 'quadruplication' """
+
             if VERBOSE: print("quad-", end = "")
             # quadruplicate the data set
             self.M[k].D[1:-1:2, 1:-1:2] = D
             self.M[k].D[2:-1:2, 1:-1:2] = D
             self.M[k].D[1:-1:2, 2:-1:2] = D
             self.M[k].D[2:-1:2, 2:-1:2] = D
+
         # debug
         if VERBOSE: print("map.A-", end = "")
+
         # loop through maps
         for k in self.M.keys():
             # re-build ANCHOR mask
             self.M[k].refreshMask(self.nn, self.ll)
+
         # debug
         if VERBOSE: print("map.C-", end = "")
+
         # loop through maps
         for k in self.M.keys():
             # reserve memory for the CLEAR mask
@@ -309,12 +353,16 @@ class SolverTwoDimensions():
                 if k == l: continue
                 # merge masks
                 self.M[k].C &= invert(self.M[l].A)
+
         # debug
         if VERBOSE: print("mesh-", end = "")
+
         # re-compute mesh
         self._computemesh()
+
         # debug
         if VERBOSE: print(">")
+
         # done
         return
 
@@ -460,14 +508,16 @@ class DiskSolid():
         if VERBOSE: print(f"create disk solid mask")
         # get array size (without edges)
         nx, ny = nn
+        # get array length
+        lx, ly = ll
         # compute index origin
         ox = (nx + 1.0) / 2.0
         oy = (ny + 1.0) / 2.0
         # compute interval
-        ax = ll / nx
-        ay = ll / ny
-        if VERBOSE: print(f"nx ny ll ox oy = ", end ='')
-        if VERBOSE: print(nx, ny, ll, ox, oy)
+        ax = lx / nx
+        ay = ly / ny
+        if VERBOSE: print(f"nx ny lx ly ox oy = ", end ='')
+        if VERBOSE: print(nx, ny, lx, ly, ox, oy)
         # boundary box
         l, r =  ceil(self.l / ax + ox), floor(self.r / ax + ox)
         t, b = floor(self.t / ay + oy),  ceil(self.b / ay + oy)
@@ -517,14 +567,16 @@ class DiskAperture():
         if VERBOSE: print(f"create disk aperture mask")
         # get array size (without edges)
         nx, ny = nn
+        # get array length
+        lx, ly = ll
         # compute index origin
         ox = (nx + 1.0) / 2.0
         oy = (ny + 1.0) / 2.0
         # compute interval
-        ax = ll / nx
-        ay = ll / ny
-        if VERBOSE: print(f"nx ny ll ox oy = ", end ='')
-        if VERBOSE: print(nx, ny, ll, ox, oy)
+        ax = lx / nx
+        ay = ly / ny
+        if VERBOSE: print(f"nx ny lx ly ox oy = ", end ='')
+        if VERBOSE: print(nx, ny, lx, ly, ox, oy)
         # boundary box
         l, r =  ceil(self.l / ax + ox), floor(self.r / ax + ox)
         t, b = floor(self.t / ay + oy),  ceil(self.b / ay + oy)
@@ -574,14 +626,16 @@ class PlateSolid():
         if VERBOSE: print(f"create plate solid mask")
         # get array size (without edges)
         nx, ny = nn
+        # get array length
+        lx, ly = ll
         # compute index origin
         ox = (nx + 1.0) / 2.0
         oy = (ny + 1.0) / 2.0
         # compute interval
-        ax = ll / nx
-        ay = ll / ny
-        if VERBOSE: print(f"nx ny ll ox oy = ", end ='')
-        if VERBOSE: print(nx, ny, ll, ox, oy)
+        ax = lx / nx
+        ay = ly / ny
+        if VERBOSE: print(f"nx ny lx ly ox oy = ", end ='')
+        if VERBOSE: print(nx, ny, lx, ly, ox, oy)
         # boundary box
         l, r =  ceil(self.l / ax + ox), floor(self.r / ax + ox)
         t, b = floor(self.t / ay + oy),  ceil(self.b / ay + oy)
@@ -632,14 +686,16 @@ class PlateAperture():
         if VERBOSE: print(f"create plate aperture mask")
         # get array size (without edges)
         nx, ny = nn
+        # get array length
+        lx, ly = ll
         # compute index origin
         ox = (nx + 1.0) / 2.0
         oy = (ny + 1.0) / 2.0
         # compute interval
-        ax = ll / nx
-        ay = ll / ny
-        if VERBOSE: print(f"nx ny ll ox oy = ", end ='')
-        if VERBOSE: print(nx, ny, ll, ox, oy)
+        ax = lx / nx
+        ay = ly / ny
+        if VERBOSE: print(f"nx ny lx ly ox oy = ", end ='')
+        if VERBOSE: print(nx, ny, lx, ly, ox, oy)
         # boundary box
         l, r =  ceil(self.l / ax + ox), floor(self.r / ax + ox)
         t, b = floor(self.t / ay + oy),  ceil(self.b / ay + oy)
@@ -788,7 +844,8 @@ def showResolution(solver, ax):
     X, Y = solver.mesh
     # show resolution visually
     nx, ny = solver.nn
-    dx, dy = solver.ll / nx, solver.ll / ny
+    lx, ly = solver.ll
+    dx, dy = lx / nx, ly / ny
     # for i, j in [(0, 0), (0, -1), (-1, 0), (-1, -1)]:
     for i, j in [(1, 1), (1, -2), (-2, 1), (-2, -2)]:
         x, y = X[i, j], Y[i, j]
@@ -811,9 +868,11 @@ def vplot(solver, figname, mapname, *args, **kwargs):
     # create filled contour map
     QCS = ax.contourf(X, Y, D, 32, *args, **kwargs)
     # adjust ticks
-    M, S = _getTickPositions(-solver.ll/2.0, +solver.ll/2.0, 9)
-    ax.set_xticks(M)
-    ax.set_yticks(M)
+    lx, ly = solver.ll
+    MX, SX = _getTickPositions(-solver.lx/2.0, +solver.lx/2.0, 9)
+    MY, SY = _getTickPositions(-solver.ly/2.0, +solver.ly/2.0, 9)
+    ax.set_xticks(MX)
+    ax.set_yticks(MY)
     # create the colour bar
     cb = fg.colorbar(QCS, cax = bx)
     cb.set_ticks(list(arange(0.0, 1.1, 0.1)))
@@ -836,9 +895,11 @@ def mplot(solver, figname, mapname):
     # create filled contour map
     QCS = ax.pcolormesh(X, Y, D, shading = 'auto', rasterized = True)
     # adjust ticks
-    M, S = _getTickPositions(-solver.ll/2.0, +solver.ll/2.0, 9)
-    ax.set_xticks(M)
-    ax.set_yticks(M)
+    lx, ly = solver.ll
+    MX, SX = _getTickPositions(-solver.lx/2.0, +solver.lx/2.0, 9)
+    MY, SY = _getTickPositions(-solver.ly/2.0, +solver.ly/2.0, 9)
+    ax.set_xticks(MX)
+    ax.set_yticks(MY)
     # create the colour bar
     cb = fg.colorbar(QCS, cax = bx)
     cb.set_ticks(list(arange(0.0, 1.1, 0.1)))
@@ -873,216 +934,164 @@ def footerText(text, fg):
 
 ###############################################################################
 
+SELECT = [
+    "CONVERGENCE",  # 0
+    "COMPARISON",   # 1
+    ][1]
+
 if __name__ == "__main__":
 
-    from matplotlib.artist import Artist
+    if SELECT == "CONVERGENCE":
+        
+        from matplotlib.artist import Artist
 
-    D = Document()
-    D.opendocument("../local/plot.pdf")
+        D = Document()
+        D.opendocument("../local/plot.pdf")
 
-    w, h, g = 0.3, 0.05, 0.05
+        w, h, g, e, r = 0.3, 0.05, 0.05, 0.0, 0.45
 
-    NN = []
-    CC = []
+        NN = []
 
-    sh = 0.0
-    # for sh in arange(0.0, w/2, w/4/16):
-    for r in range(1, 8):    
-        NN.append(
-        ([0.45],                 # shield (radius)
-        [+sh, (+h+g)/2.0, w, h], # top    (x,y,w,h)
-        [-sh, (-h-g)/2.0, w, h], # bottom (x,y,w,h)
-        [100]*r)                 # series (steps, ...)
-        )
+        # for n in [1, 5, 10, 50, 100, 200]:
+        for n in [3, 10, 30, 100, 300]:
+            NN.append(
+                ([r],                       # shield (radius)
+                [+e, (+h+g)/2.0, w, h],     # top    (x,y,w,h)
+                [-e, (-h-g)/2.0, w, h],     # bottom (x,y,w,h)
+                [n]*8)                      # series (steps, ...)
+            )
 
-    for SH, C1, C2, N in NN:
+        X, Y = [], []
 
-        S = SolverTwoDimensions(3)
+        for SH, C1, C2, N in NN:
 
-        S.addMap("SH", DiskAperture(*SH)) # shield
-        S.addMap("C1",   PlateSolid(*C1)) # plate 1
-        S.addMap("C2",   PlateSolid(*C2)) # plate 2
+            S = SolverTwoDimensions()
 
-        K, R = S.jacobiStepSeries(N, "C1", "C2")
-        CC.append(R[-1])
+            S.addMap("SH", DiskAperture(*SH)) # SHIELD
+            S.addMap("C1",   PlateSolid(*C1)) # PLATE1
+            S.addMap("C2",   PlateSolid(*C2)) # PLATE2
 
-        fg, ax, bx = vplot(S, "FIGURE", "C1")
-    
-        nx, ny = S.nn
+            K, C = S.jacobiStepSeries(N, "C1", "C2")
 
-        txt  = f"width = {w}mm\n"
-        txt += f"height = {h}mm\n"
-        txt += f"gap = {g}mm\n"
-        txh = headerText(txt, fg)
+            fg, ax = selectfigure("PLOT")
+            ax.semilogx(K, array(C)*1E12, ".-")
+            ax.set_xlabel("step value")
+            ax.set_ylabel("Capacitance computed [pF/m]")
 
-        txt  = f"total steps = {K[-1]:6}\n"
-        txt += f"capacity  = {R[-1]*1E12:.3f}pF\n"
-        txf = footerText(txt, fg)
+            X.append(K[-1])
+            Y.append(C[-1])
+            print(K[-1], C[-1])
 
-        ax.set_title(f"{nx} X {ny}\n")
+        fg, ax = selectfigure("RESULTS")
+        ax.semilogx(X, array(Y)*1E12, ".-")
 
-        D.exportfigure("FIGURE") 
-        ax.clear()
+        ax.set_xlabel("STEPS / SERIES LENGTH")
+        ax.set_ylabel("Capacitance computed [pF/m]")
+        ax.set_ylim(0.0, 100.0)
 
-        Artist.remove(txh)
-        Artist.remove(txf)
+        D.exportfigure("PLOT") 
+        D.exportfigure("RESULTS") 
 
-    D.closedocument()
+        D.closedocument()
 
+    if SELECT == "COMPARISON":
 
+        DATA = array([
+            [
+            3, 3.0436270563981022e-12,
+            10, 5.1216678036887545e-12,
+            30, 5.388440551520647e-12,
+            100, 5.384585983847195e-12,
+            300, 5.3845859348425295e-12,
+            ],
+            [
+            7, 1.3545469497385262e-11,
+            21, 1.4124039507603287e-11,
+            61, 1.3673979676305713e-11,
+            200, 1.3576555499625977e-11,
+            600, 1.3576477010394754e-11,
+            ],
+            [
+            10, 2.2063907663026516e-11,
+            32, 2.3459003810195627e-11,
+            92, 2.3688678652095264e-11,
+            300, 2.386603938645882e-11,
+            900, 2.3916223989714314e-11,
+            ],
+            [
+            15, 3.4069942354760546e-11,
+            43, 3.634845120054825e-11,
+            123, 3.638886271302465e-11,
+            401, 3.6355243645236484e-11,
+            1200, 3.637257009179239e-11,
+            ],
+            [
+            19, 5.0055143884454275e-11,
+            54, 5.148642724515242e-11,
+            154, 5.182449505402855e-11,
+            500, 5.176298878944347e-11,
+            1500, 5.1766003171494677e-11,
+            ],
+            [
+            23, 5.893946748795823e-11,
+            65, 5.780413511747902e-11,
+            184, 5.78213629295024e-11,
+            600, 5.784758349382356e-11,
+            1800, 5.785180109663687e-11,
+            ],
+            [
+            27, 6.04384253286411e-11,
+            76, 5.851355714867663e-11,
+            215, 5.817602289962751e-11,
+            700, 5.7952018021336755e-11,
+            2100, 5.7888629596266815e-11,
+            ],
+            [
+            31, 6.332311209754091e-11,
+            87, 6.048215759261286e-11,
+            247, 5.992852197701082e-11,
+            801, 5.971289191392915e-11,
+            2400, 5.967733448169437e-11,
+            ],
+            [
+            35, 6.832368567458584e-11,
+            98, 6.308824560138485e-11,
+            275, 6.205336337416299e-11,
+            907, 6.169605168399679e-11,
+            2700, 6.158444576691678e-11,
+            ],
+            [
+            39, 7.113133410465773e-11,
+            100, 6.415771689528503e-11,
+            308, 6.27469380545123e-11,
+            1000, 6.227336547622629e-11,
+            3000, 6.209861777818127e-11,
+            ],
+            ])
 
-#########################################################################
-###                 SETS OF SELECTED RESULTS                          ###
-#########################################################################
+        from numpy import size, shape
 
+        D = Document()
+        D.opendocument("../local/plot.pdf")
 
+        fg, ax = selectfigure("RESULTS1")
+        N = 8
+        for j in range(shape(DATA)[0]):
+            X, Y = DATA[j, 0::2], DATA[j, 1::2]
+            ax.semilogx(X, Y*1E12, ".-", label = f"{N}x{N}")
+            N <<= 1
 
-# SET 1 #######################################################################
+        ax.set_xlabel("iterations")
+        ax.set_ylabel("Computed capacitance[pF/m]")
+        ax.legend()
+        D.exportfigure("RESULTS1") 
 
-"""
+        fg, ax = selectfigure("RESULTS2")
+        X, Y = DATA[:, -2], DATA[:, -1]
+        ax.semilogx(X, Y*1E12, ".-")
 
-8 X 8 -> 4096 X 4096
+        ax.set_xlabel("iterations")
+        ax.set_ylabel("Computed capacitance[pF/m]")
+        D.exportfigure("RESULTS2") 
 
-NN = [
-    (3, [2]*10),
-    (3, [5]*10),
-    (3, [10]*10),
-    (3, [50]*10),
-    (3, [100]*10),
-    (3, [500]*10),
-    (3, [1000]*10),
-]
-
- steps, capacitance
-
-    20, 0.352   0.35
-    50, 29.103  29.1
-    91, 37.478  37.5
-   512, 37.646  37.6
-   991, 37.448  37.4
-  5327, 37.016  37.0
-  9991, 36.981  37.0
-
-"capycity_dev/outputs/CoaxialCapacitorConvergenceSeries.pdf"
-
-"""
-
-# SET 2 #######################################################################
-
-"""
-
-NN = [
-    #     8  16   32   64   128   256   512  1024  2048
-    (3, [20, 75, 200, 400, 2000, 1200, 2000, 2000, 10000]),
-]
-
-for x1, x2, y1, y2, tt in [
-    (   1,    50, -5.0, 30.0,    "8 x 8"),
-    (  10,   150, 25.0, 38.0,   "16 x 16"),
-    (  80,   400, 29.0, 38.0,   "32 x 32"),
-    ( 250,   800, 29.0, 33.0,   "64 x 64"),
-    ( 500,  4000, 32.0, 37.0,  "128 x 128"),
-    (2500,  5000, 35.5, 37.0,  "256 x 256"),
-    (3500,  7000, 36.4, 37.0,  "512 x 512"),
-    (5000, 10000, 36.5, 37.0, "1024 x 1024"),
-    (5000, 20000, 36.6, 37.0, "2048 x 2048"),
-    ]:
-    ax.set_xlim(x1, x2)
-    ax.set_ylim(y1, y2)
-    ax.set_title(tt)
-    D.exportfigure("FIGURE") 
-
- steps, capacitance
-
-   8x8,       21,  26.128
-  16x16,     103,  33.220
-  32x32,     303,  29.493
-  64x64,     713,  32.648
- 128x128,   2906,  35.712
- 256x256,   4220,  36.706
- 512x512,   6126,  36.558
-1024x1024,  8102,  36.699
-2048x2048, 18729, 36.912
-
-[Finished in 3665.9s]
-
-One minute past an hour: mostly the last series: 2048x2048: 10000 points
-
-"capycity_dev/outputs/CoaxialCapacitorConvergenceSeries-2.pdf"
-
-"""
-
-# SET 3 #######################################################################
-
-"""
-
-NN = [
-    #     8  16  32   64  128  256  512 1024 2048
-    (3, [20, 20, 20, 100, 100, 200, 200, 200, 200]),
-]
-
-for x1, x2, y1, y2, tt in [
-    (   1,    50, -5.0, 30.0,    "8 x 8"),
-    (  10,   150, 25.0, 38.0,   "16 x 16"),
-    (  80,   400, 29.0, 38.0,   "32 x 32"),
-    ( 250,   800, 29.0, 33.0,   "64 x 64"),
-    ( 500,  4000, 32.0, 37.0,  "128 x 128"),
-    (2500,  5000, 35.5, 37.0,  "256 x 256"),
-    (3500,  7000, 36.4, 37.0,  "512 x 512"),
-    (5000, 10000, 36.5, 37.0, "1024 x 1024"),
-    (5000, 20000, 36.6, 37.0, "2048 x 2048"),
-    ]:
-    ax.set_xlim(x1, x2)
-    ax.set_ylim(y1, y2)
-    ax.set_title(tt)
-    D.exportfigure("FIGURE") 
-
-    21, 26.128
-    40, 33.570
-    61, 30.552
-   165, 32.713
-   275, 35.732
-   488, 36.788
-   696, 36.623
-   860, 36.774
-  1063, 37.024
-
-[Finished in 74.0s]
-
-only fourteen seconds past one minute!
-
-"capycity_dev/outputs/CoaxialCapacitorConvergenceSeries-3.pdf"
-
-"""
-
-# SET 4 #######################################################################
-
-"""
-
-NN = [
-    (3, [20]),       #   8
-    (4, [50]),       #   16
-    (5, [250]),      #   32
-    (6, [1000]),     #   64
-    (7, [4000]),     #   128
-    (8, [15000]),    #   256
-    (9, [60000]),    #   512
-    (10, [100000]),  #  1024
-]
-
-    20, 26.131  8
-    50, 33.247  16
-   250, 29.481  32
-   991, 32.644  64
-  4028, 35.708  128
- 15547, 36.701  256
- 62793, 36.548  512
- 99991, 34.802 1024 - clearly not converging yet (see graph)
-
-[Finished in 7567.8s]
-
-Very slow convergence for high resolutions: 5 mins past two hours.
-
-"capycity_dev/outputs/CoaxialCapacitorConvergenceSeries-4.pdf"
-
-"""
+        D.closedocument()
