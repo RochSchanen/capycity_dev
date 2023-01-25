@@ -937,7 +937,7 @@ def footerText(text, fg):
 SELECT = [
     "CONVERGENCE",  # 0
     "COMPARISON",   # 1
-    ][1]
+    ][0]
 
 if __name__ == "__main__":
 
@@ -975,7 +975,7 @@ if __name__ == "__main__":
 
             fg, ax = selectfigure("PLOT")
             ax.semilogx(K, array(C)*1E12, ".-")
-            ax.set_xlabel("step value")
+            ax.set_xlabel("iterations")
             ax.set_ylabel("Capacitance computed [pF/m]")
 
             X.append(K[-1])
@@ -985,7 +985,7 @@ if __name__ == "__main__":
         fg, ax = selectfigure("RESULTS")
         ax.semilogx(X, array(Y)*1E12, ".-")
 
-        ax.set_xlabel("STEPS / SERIES LENGTH")
+        ax.set_xlabel("iterations")
         ax.set_ylabel("Capacitance computed [pF/m]")
         ax.set_ylim(0.0, 100.0)
 
