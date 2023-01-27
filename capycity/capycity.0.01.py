@@ -16,9 +16,9 @@ version = 0.02
         of the higher resolution map is redefined as a subset of
         the original map. The outer coarser map works where the
         potential gradients are small (towards the edges with a
-        shield of large size). Maybe, in the futur, the size and
+        shield of large size). Maybe, in the future, the size and
         number of sub-map can be arbitrary. This is why a recursive
-        scheme is now chosen for futur improvements
+        scheme is now chosen for future improvements
 
     improve next:
 
@@ -81,14 +81,14 @@ from numpy import uint32 as _DT
 """ The data type precision is determined here. Empirically, the
 algorithm converges well using the 32 bits unsigned integer type.
 The lower 8 bits unsigned integer type is not sufficient but can
-be used for debugging puposes. Select the required length of bits
+be used for debugging purposes. Select the required length of bits
 by un-commenting one of previous declarations lines. """
 
 # EXTREMA (zero value and maximum value)
 ZV, MV = array([0, -1], _DT)
-""" Extremum values are computed here. The maximum value might
-have to be decreased by a factor 4 in order to prevent overflowing
-events during the evaluation of some optimised algorithms. """
+""" Extrema are computed here. The maximum value might have to be
+decreased by a factor 4 in order to prevent overflowing events
+during the evaluation of some optimised algorithms. """
 
 class SolverTwoDimensions():
 
@@ -108,7 +108,7 @@ class SolverTwoDimensions():
         are upgraded to fit the new grid size. Sub-maps can be
         later added on, with higher resolutions and smaller sizes,
         in order to improve accuracy without depleting our computer
-        ressources too fast. """
+        resources too fast. """
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
         
         # GRID LENGTH (physical length in meters)
@@ -128,7 +128,7 @@ class SolverTwoDimensions():
         masks are automatically created when a new map is added.
         The ANCHOR mask defines the shape of the part. The masks
         can be build using pre-defined or user-defined methods.
-        In the futur, masks should be obtained also by merging
+        In the future, masks should be obtained also by merging
         existing masks. """
 
         # ITERATIONS
@@ -142,7 +142,7 @@ class SolverTwoDimensions():
 
     def addPart(self, name, mask = None):                         # +
         """ this adds a new conductor part to the system. A specific
-        map is instanciated to solve the poisson equation for this
+        map is instantiated to solve the Poisson equation for this
         particular part. An ANCHOR mask that defines the shape of the
         part can be provided now or later. A CLEAR mask is created
         automatically from the parts already existing. Some sub-maps
@@ -384,7 +384,7 @@ class SolverTwoDimensions():
     def addSubMap(self, l):                                       # !
 
         """ add a new sub-map to all existing parts. the size is 
-        computed from l. the new map is square and centered. """
+        computed from l. the new map is square and centred. """
 
         # done
         return    
@@ -452,9 +452,9 @@ class _map():
 
     def setboundary(self, l, r, t, b):
 
-        """ the given boundaries data are automatically centered and
+        """ the given boundaries data are automatically centred and
         set to the outer boundary of this map. If this method is
-        never called, the outer bondary is left at the the zero value
+        never called, the outer boundary is left at the the zero value
         ZV by default. """
 
         # done
@@ -507,14 +507,14 @@ class _map():
         substantially faster. """
 
         """
-        Also, the algorithm of Guauss-Seidel could be
+        Also, the algorithm of Gauss-Seidel could be
         implemented instead (explicit loop). However,
         this requires an implementation in cpython or
         some pre-compilation with optimisation.
         """        
         
         """
-        Another thing. It may be worth invertigate the
+        Another thing. It may be worth investigate the
         use of the graphic card ability of processing
         these operations very fast: like operation on
         images. All the computation are linear and most
@@ -536,7 +536,7 @@ class _map():
         """ should be able to reduce the number of divisions
         by summing first and dividing (double shifting) only
         once after. However, be aware of the possible overflow
-        of our unsigned interger type. This could work if we
+        of our unsigned integer type. This could work if we
         divided MV by a factor four. That would prevent a
         possible overflow: the idea needs to be tested.
         """
@@ -552,7 +552,7 @@ class DiskSolid():
     # parameters
     def __init__(self, r):
 
-        if VERBOSE: print("instanciate 'DiskSolid'")
+        if VERBOSE: print("instantiate 'DiskSolid'")
 
         # record parameters
         self.l, self.r = -r, +r
@@ -876,7 +876,7 @@ def selectfigure(name):
     return fg, ax
 
 def selectmapfigure(name):
-    # map figure is the same as selectfigure
+    # map figure is the same as selectfigure()
     # but adds an extra axis for a side colour bar
     # it also returns an extra axis
     if not fignum_exists(name): 
@@ -977,8 +977,8 @@ def headerText(text, fg):
     x, y = (1-w)/2, (1-h)/2
     tx = fg.text(x+w/2, 3*y/2+h, text)
     tx.set_fontfamily('monospace')
-    tx.set_horizontalalignment('center')
-    tx.set_verticalalignment('center')
+    tx.set_horizontalalignment('centre')
+    tx.set_verticalalignment('centre')
     tx.set_fontsize('large')
     return tx
 
@@ -987,8 +987,8 @@ def footerText(text, fg):
     x, y = (1-w)/2, (1-h)/2
     tx = fg.text(x+w/2, y/2, text)
     tx.set_fontfamily('monospace')
-    tx.set_horizontalalignment('center')
-    tx.set_verticalalignment('center')
+    tx.set_horizontalalignment('centre')
+    tx.set_verticalalignment('centre')
     tx.set_fontsize('large')
     return tx
 
@@ -1156,7 +1156,6 @@ if __name__ == "__main__":
         D.exportfigure("RESULTS2") 
 
         D.closedocument()
-
 
     if SELECT == "MULTI-GRID":
 

@@ -149,18 +149,19 @@ D = array([
 
 ])
 
-from capycity.graphics import selectfigure, exportfigure
-from capycity.graphics import opendocument, closedocument
+from capycity.capycity import selectfigure
+from capycity.capycity import Document
 
-fg, ax = selectfigure("F")
+fg, ax = selectfigure("FH")
 ax.plot(D[:, 0], D[:, 1], "r.-")
 ax.plot(D[:, 0]+30, D[:, 1], "b.-")
 ax.set_ylim(0, 200)
-ax.grid("True")
 ax.set_xlabel("angle [degrees]")
 ax.set_ylabel("Capacitance [pF]")
 ax.vlines([list(array([-12, -6, 0, +6, +12])+6.40)], 0, 200, "k", "dashed")
+ax.grid("True")
 
-opendocument("./outputs/capacitance_measurements.pdf")
-exportfigure("F")
-closedocument()
+doc = Document("./local/capacitance_measurements.pdf")
+doc.exportfigure("FH")
+doc.closedocument()
+

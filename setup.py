@@ -10,7 +10,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name = "capycity",
-    version = "0.0.1",
+    version = "0.0.0",
     author = "Roch Schanen",
     author_email = "r.schanen@lancaster.ac.uk",
     description = "Capacitance Calculator",

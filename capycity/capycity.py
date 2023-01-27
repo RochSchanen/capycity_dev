@@ -1,33 +1,44 @@
 
-# VERSION
-version = 0.01
-"""
-    - remove the powers of two constrain.
-    - keep the square shape
+# DEBUG DISPLAY
+VERBOSE     = False
+VERBOSE_MAP = False
 
-    improve:
+# (TBI) means "to be implemented"
+
+# VERSION
+version = 0.02
+"""
+
+    implement multi grid:
+        keep the square shape. use concentric increase of the
+        resolution with a list of concentric sizes: it is a
+        re-implementation of the JacobiStepSeries where the size
+        of the higher resolution map is redefined as a subset of
+        the original map. The outer coarser map works where the
+        potential gradients are small (towards the edges with a
+        shield of large size). Maybe, in the future, the size and
+        number of sub-map can be arbitrary. This is why a recursive
+        scheme is now chosen for future improvements
+
+    improve next:
 
         - use diff instead of gradient to prevent usage of float
-        and keep the use of integers to accelerate calculations and
-        prevent from using too much memory (see also multi grid).
+        and keep the use of integers for keeping calculations
+        fast and prevent from using too much memory.
 
         - decrease the maximum value by a factor 4. Sum the arrays
-            first and then divide (double shift) the sum by fouronly
-            once instead of four times as it is implemented now.
+            first and then divide (double shift) the sum by four
+            only once instead of four times as it is implemented
+            now.
 
-    next steps:
-
-        - implement multi grid:
-            keep the square shape. use concentric increase of the
-            resolution with a list of concentric sizes: it is a
-            re-implementation of the JacobiStepSeries where the size
-            of the higher resolution map is redefined as a subset of
-            the original map. The outer coarser map works where the
-            potential gradients are small (towards the edges with a
-            shield of large size).
-        
         - allow rectangular shape
+
+        - merge anchor masks
+
+        - check on convergence factor technique and Gauss-Seidel
+
 """
+if VERBOSE: print(f"version {version}")
 
 # LIBRARIES
 
@@ -64,157 +75,141 @@ from matplotlib.pyplot import cm
 from matplotlib.backends.backend_pdf import PdfPages
 
 # DATA TYPE
-
-""" The data type precision is fixed here. Empirically, the algorithm
-converges well when using 32 bits unsigned integers. A lower 8 bits
-unsigned integer type is not sufficient but can be used for
-debugging. Select the required length of bits by un-commenting one of
-following three lines: """
-
-# from numpy import uint8  as _DT
-# from numpy import uint16  as _DT
 from numpy import uint32 as _DT
+# from numpy import uint16 as _DT
+# from numpy import uint8  as _DT
+""" The data type precision is determined here. Empirically, the
+algorithm converges well using the 32 bits unsigned integer type.
+The lower 8 bits unsigned integer type is not sufficient but can
+be used for debugging purposes. Select the required length of bits
+by un-commenting one of previous declarations lines. """
 
 # EXTREMA (zero value and maximum value)
 ZV, MV = array([0, -1], _DT)
-
-# DEBUG DISPLAY
-VERBOSE_MAP = False
-VERBOSE = False
+""" Extrema are computed here. The maximum value might have to be
+decreased by a factor 4 in order to prevent overflowing events
+during the evaluation of some optimised algorithms. """
 
 class SolverTwoDimensions():
 
-    def __init__(self, nx = 8, ny = None, lx = 1.0, ly = None):
-
+    def __init__(self, n = 8, l = 1.0):                           # +
+        """ GENERAL DESCRIPTION HERE """
         if VERBOSE: print(f"instantiate 'SolverTwoDimensions'")
 
-        # GRID
-        
-        """ the grid size is set for all the maps and masks.
+        # ALL MAPS ARE SQUARE
+        nx, ny = n, n
+        lx, ly = l, l
+
+        # GRID SIZE (number of grid points)
+        # if ny is None: ny = nx
+        self.ll = lx, ly
+        """ the top grid size is set for all the maps and masks.
         When the grid resolution is changed, maps and masks
-        are upgraded to fit the new grid size. """
-        
-        # compute initial size
-        if ny is None: ny = nx
+        are upgraded to fit the new grid size. Sub-maps can be
+        later added on, with higher resolutions and smaller sizes,
+        in order to improve accuracy without depleting our computer
+        resources too fast. """
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
-
-        # LENGTH
-
-        """ the length is set for a square shape only so far.
-        therefore, just use square grids for the moment. it will
-        be extended to two independent lengths later. The issue
-        is that the grid size and length ratio must be kept
-        identical """
-
-        if ly is None: ly = ny*lx/nx
+        
+        # GRID LENGTH (physical length in meters)
+        # if ly is None: ly = ny*lx/nx
+        self.nn = nx, ny
+        """ the length is set for a square shape at the moment.
+        Two independent lengths will be added later. The issue
+        here is that the grid size and length ratio must be kept
+        identical at all time. """
         if VERBOSE: print(f"lx = {lx}, ly = {ly}")
 
-        # local
-        self.ll = lx, ly    # grid length
-        self.nn = nx, ny    # grid size
-
-        self._computemesh()
-
         # MAPS AND MASKS
+        self.M = {} 
+        """ Masks define the geometry of the conducting parts
+        that compose the the capacitance to compute. There is
+        one potential field map to be evaluated per part. New
+        masks are automatically created when a new map is added.
+        The ANCHOR mask defines the shape of the part. The masks
+        can be build using pre-defined or user-defined methods.
+        In the future, masks should be obtained also by merging
+        existing masks. """
 
-        """ Masks define the geometry of the conducting materials
-        that compose the the capacitance to calculate. There is
-        one potential field map to compute per conductor/mask. New
-        maps are automatically created when new masks are added.
-        Masks are build using pre-defined or user-defined methods.
-        A single mask can be obtained by merging several mask."""
-        
-        self.M = {}
-
-        # current step number
+        # ITERATIONS
         self.k = 1
+        """  an iteration index is regularly updated at each step
+        of the computation or each increase of the resolution, or
+        each creation of a sub-map. """
 
         # done
         return
 
-    def addMap(self, name, mask = None):
-
-        """ create a new map to hold a new component to the
-        capacitance. A CLEAR map and a ANCHOR map are automatically
-        added for the computation. The ANCHOR map should contain
-        the shape of the solid. Where the maps is solid, the value is
-        VM, otherwise, the value is ZV. A CLEAR map is build from all
-        the other maps already available. """
-        
+    def addPart(self, name, mask = None):                         # +
+        """ this adds a new conductor part to the system. A specific
+        map is instantiated to solve the Poisson equation for this
+        particular part. An ANCHOR mask that defines the shape of the
+        part can be provided now or later. A CLEAR mask is created
+        automatically from the parts already existing. Some sub-maps
+        can be added later, with smaller size and higher resolution,
+        when necessary. Where the part is solid, the value of the
+        anchor mask should be VM, otherwise, the value should be ZV.
+        """
         if VERBOSE: print(f"new map '{name.upper()}'")
-        # instantiate new map class
-        self.M[name] = _map(self.nn)
-        # build CLEAR mask
+        # instantiate new map for this part
+        self.M[name] = _map(self.nn, self.ll)
+        # build a CLEAR mask for this part
         for k in self.M.keys():
             if k == name: continue
-            # merge clear map 
+            # merge CLEAR maps from other parts
             self.M[name].C &= invert(self.M[k].A)
-        # no mask, done
-        if mask is None: return
-        # add mask
+        # add an anchor mask if already provided
+        if mask == None: return
         self.addMask(name, mask)
         # done
         return
 
-    def addMask(self, name, mask):
-        # merge new mask to the "named map"
-        self.M[name].setMask(mask, self.nn, self.ll)
-        # update clear maps
+    def addMask(self, name, mask):                                # +
+        # add new mask
+        self.M[name].addNewAnchor(mask)
+        # update CLEAR masks of other parts
         I = invert(self.M[name].A)
         for k in self.M.keys():
             if k == name: continue
-            # merge clear map
+            # merge with other parts
             self.M[k].C &= I
         # done
         return
 
-    def _computemesh(self):
-        nx, ny = self.nn
-        lx, ly = self.ll
-        # intervals
-        dx, dy = lx / nx, ly / ny
-        # boundaries
-        bx, by = (lx - dx) / 2.0, (ly - dy) / 2.0
-        # domains
-        Dx, Dy = linspace(-bx, +bx, nx), linspace(-by, +by, ny)
-        # mesh
-        self.mesh = meshgrid(Dx, Dy)
-        # done
-        return
-
-    def jacobiStep(self, C):
-        """ run through the sevral maps that belong to the
-        conductor C and evaluate the jacobi step for each after
-        setting up the boundary conditions. change M to MM: single
-        map to multiple maps (one of each resolution).
-        """        
-        return
-
-    def jacobiSteps(self, n, C1, C2, SavePattern = None):
-        """ using the same number of steps on every map is justified
-        if the convergence rate depends mostly on the size/resolution
-        of the grid and not so much on the geometry of the system.
-        This should also allow to devise an alternating series of
-        incrementing the resolution followed by a steps series that
-        could be used for all cases: see the next method """
+    def jacobiSteps(self, n, name1, name2, SavePattern = None):   # +
+        """ Perform a series of "n" Jacobi steps on the
+        maps associated with part "name1" and part "name2".
+        It returns the capacitance value at the end of the
+        series or it can record a series of capacitance values
+        following the optional "SavePattern" argument. This
+        argument is a list of indices for which the capacitance
+        has to be calculated. The same number of steps is
+        applied to all maps. This is justified if the convergence
+        rate depends only/mostly on the size of the grid and
+        not so much on the geometry (masks definitions) of the
+        parts. This assumption also should allow to devise
+        a fixed series of "resolution increments"/"Jacobi steps"
+        that should be valid for all geometries and should only
+        depends on the grid size. """
         K, C = [], []
         for i in range(n):
             # n Jacobi step iterations over C1 and C2
-            self.M[C1].jacobiStep() # change to self.jacobiStep(C1)
-            self.M[C2].jacobiStep() # change to self.jacobiStep(C2)
+            self.M[name1].jacobiStep()
+            self.M[name2].jacobiStep()
             # save if step match pattern element
-            if (self.k+i) in SavePattern:
-                K.append(self.k+i)
-                C.append(self.computeCapacitance(C1, C2))
+            if SavePattern:
+                if (self.k+i) in SavePattern:
+                    K.append(self.k+i)
+                    C.append(self.computeCapacitance(name1, name2))
         # increment step counter
         self.k += n
         # return a single value
         if SavePattern is None:
-            return self.computeCapacitance(C1, C2)
+            return self.computeCapacitance(name1, name2)
         # return saved data
         return K, C
 
-    def jacobiStepSeries(self, S, C1, C2, n = 500):
+    def jacobiStepSeries(self, S, C1, C2, n = 500):               # !
         """ S is a list of step series numbers. After each step
         series, the resolution of the grid is incremented by a factor
         two. This is why the resolution of the grid is always a power
@@ -259,7 +254,21 @@ class SolverTwoDimensions():
         # done 
         return K, C
 
-    def computegradient(self, name):
+    def meshgrid(self):                                           # !
+        # get grid sizes
+        nx, ny = self.nn
+        # get grid lengths
+        lx, ly = self.ll
+        # intervals
+        dx, dy = lx / nx, ly / ny
+        # boundaries
+        bx, by = (lx - dx) / 2.0, (ly - dy) / 2.0
+        # domains
+        Dx, Dy = linspace(-bx, +bx, nx), linspace(-by, +by, ny)
+        # done
+        return meshgrid(Dx, Dy)
+
+    def computegradient(self, name):                              # !
         """ The electric field is directly computed
         as the gradient of the electric scalar potential """
         nx, ny = self.nn
@@ -273,7 +282,7 @@ class SolverTwoDimensions():
         # done
         return
 
-    def computeCapacitance(self, name1, name2):
+    def computeCapacitance(self, name1, name2):                   # !
         nx, ny = self.nn
         lx, ly = self.ll
         # compute interval (intervals should be identical)
@@ -296,72 +305,70 @@ class SolverTwoDimensions():
         # done
         return c
 
-    def incrementResolution(self):
-
-        """ increase the resolution by a factor two. It can be noticed
-        empirically that with larger resolution, the Jacobi iteration
-        "propagates" the scalar potential "wave" at a slower "velocity".
-        At lower resolutions the convergence to an approximate solution
-        is quicker. In order to benefit from that observation, a gradual
-        incrementation of the resolution is performed. The convergence
-        to an accurate solution is preserved without compromising to much
-        the computing time. """
-
-        if VERBOSE: print("<-", end = "")
-
-        # get current values
-        nx, ny = self.nn        
-
-        # update local
-        nx, ny = nx<<1, ny<<1
-
-        # update values
-        self.nn = nx, ny
+    def incrementResolution(self):                                # !
+        """ increases the resolution of the main map
+        by a factor two. The length is left unchanged.
+        Therefore the resolution is increased by the
+        same factor. It can be noticed empirically that
+        with larger resolution, the Jacobi iteration
+        "propagates" the potential values at a slower
+        "pace". At lower resolutions the convergence
+        to an approximate solution is a lot quicker.
+        In order to increase the convergence speed,
+        a gradual incrementation of the resolution
+        is performed between series of Jacobi steps.
+        The convergence to an accurate solution is
+        preserved without compromising to much the
+        computing time. This scheme is not used with
+        sub-maps, only with the main map. """
 
         # debug
+        if VERBOSE: print("<-", end = "")
+        # get current values
+        nx, ny = self.nn        
+        # update to new values
+        nx, ny = nx<<1, ny<<1
+        # register the new values
+        self.nn = nx, ny        
+        # debug
         if VERBOSE: print("map.D-", end = "")
-
-        # loop through maps
+        # QUADRUPLICATE ALL DATA MAPS AND UPDATE LOCALS
         for k in self.M.keys():
-
+            # update grid size
+            self.M[k].nn = nx, ny
             # save current data for the upgrade
             D = copy(self.M[k].D[1:-1, 1:-1])
             """ edges are ignored. """
-
             # reserve memory for the new data set
             self.M[k].D = full([nx+2, ny+2], ZV, _DT)
-            """ the new data set is initialised to zeros.
-            This is clearing up the edges. The rest of the
-            array is defined during the 'quadruplication' """
-
+            """ the new data set is initialised to
+            zeros. This is clearing up the edges.
+            The rest of the array is defined during
+            the 'quadruplication' """
+            # debug
             if VERBOSE: print("quad-", end = "")
             # quadruplicate the data set
             self.M[k].D[1:-1:2, 1:-1:2] = D
             self.M[k].D[2:-1:2, 1:-1:2] = D
             self.M[k].D[1:-1:2, 2:-1:2] = D
             self.M[k].D[2:-1:2, 2:-1:2] = D
-
         # debug
         if VERBOSE: print("map.A-", end = "")
-
-        # loop through maps
+        # RE-BUILD ALL ANCHOR MASKS
         for k in self.M.keys():
             # re-build ANCHOR mask
-            self.M[k].refreshMask(self.nn, self.ll)
-
+            self.M[k].buildAnchorMask()
         # debug
         if VERBOSE: print("map.C-", end = "")
-
-        # loop through maps
+        # RE-BUILD ALL CLEAR MASKS
         for k in self.M.keys():
-            # reserve memory for the CLEAR mask
+            # reserve new memory for the new CLEAR mask
             self.M[k].C = full([nx+2, ny+2], MV, _DT)
-            # loop though all the other maps
+            # loop though all the other parts
             for l in self.M.keys():
                 if k == l: continue
                 # merge masks
                 self.M[k].C &= invert(self.M[l].A)
-
         # debug
         if VERBOSE: print("mesh-", end = "")
 
@@ -374,86 +381,84 @@ class SolverTwoDimensions():
         # done
         return
 
+    def addSubMap(self, l):                                       # !
+
+        """ add a new sub-map to all existing parts. the size is 
+        computed from l. the new map is square and centred. """
+
+        # done
+        return    
+
 class _map():
 
-    """
-        I need to add a method that allows to vary the values at the 
-        boundary that comes from the other maps that have different
-        resolutions. This boundaries are set at the level of the
-        JacobiSteps method. The boundary are centered about the
-        center of the map. For all maps, the outer boundary can be
-        set or left at zero (intial setup). For all maps but the
-        center map (highest resolution), another set of bondaries
-        can be imposed.
-    """
-
-    def getboundary(self):
-        """ the boundaries are automatically centered """
-        l, r, t, b = None, None, None, None
-        return l, r, t, b
-
-    def setboundary(self, l, r, t, b):
-        """ the boundaries are automatically centered """
-        return        
-
-    def __init__(self, nn):
+    def __init__(self, nn, ll):
+        """ GENERAL DESCRIPTION """
         if VERBOSE: print(f"instantiate '_map'")
-        # get grid size
+        # save parameters locally
+        self.nn, self.ll = nn, ll
+        # get detailed geometry for declarations
         nx, ny = nn
+        # debug
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
-        # new data map (potential between conductors)
+        # create new data map (potential between conductors)
         self.D = full([nx+2, ny+2], ZV, _DT)
-        # clear map (zero potential from other conductors)
+        # create new CLEAR map (zero potential from other parts)
         self.C = full([nx+2, ny+2], MV, _DT)
-        # anchor map (unit potential from this conductor)
+        # create new anchor map (unit potential from this part)
         self.A = full([nx+2, ny+2], ZV, _DT)
         # debug
         if VERBOSE_MAP: print(f"map:")
         if VERBOSE_MAP: print(f"{self.D}")
-        # declare masks list
+        """ extend display to sub-maps """
+        # declare mask functions list
         self.M = None
-        # declare gradients list
+        # gradient map storage
         self.dD = None
         # done
         return
 
-    """ maybe the two next
-    methods can be merged...
-    or made independent... """
-
-    """ This adds a new solid shape
-    that is registered by merging it
-    to the existing ANCHOR map. There
-    is only one mask implemented for
-    the moment.
-    """
-    def setMask(self, mask, nn, ll):
-        # register the class instance
+    def addNewAnchor(self, mask):                                 # -
+        # register a new mask
         self.M = mask
-        # and setup anchor map
-        self.refreshMask(nn, ll)
+        # self.M.append(mask)
+        """ so far, only a single mask can be used
+        later, more of them could be added and
+        merged together using the buildAnchorMask()
+        method """
+        self.buildAnchorMask()
         # done
         return
 
-    """ when there is more than one
-    function to build the mask, a set
-    of masks that must be merged together.
-    This is done through refreshMask()
-    """
-    def refreshMask(self, nn, ll):
-        
-        # go through all map building function HERE!
-        # go through all map building function HERE!
-        # go through all map building function HERE!
-
-        # use the registered mask methods
+    def buildAnchorMask(self):                                    # -
+        # MERGE ANCHOR MAPS
+        self.A = self.M.mask(self.nn, self.ll)
         # self.A |= self.M.mask(nn, ll)
-        self.A = self.M.mask(nn, ll)
-        # debug        
+        """ when there is more than one mask constructor
+        to build the mask, all the masks generated must be
+        merged together here."""
         if VERBOSE_MAP: print(f"anchor map:")
         if VERBOSE_MAP: print(f"{self.A}:")
         # done
         return
+
+    def getboundary(self):
+
+        l, r, t, b = None, None, None, None
+        """ the outer layers of the map are averaged and returned to
+        the calling map. """
+        
+        # done
+        return l, r, t, b
+
+    def setboundary(self, l, r, t, b):
+
+        """ the given boundaries data are automatically centred and
+        set to the outer boundary of this map. If this method is
+        never called, the outer boundary is left at the the zero value
+        ZV by default. """
+
+        # done
+        return        
 
     def applyMasks(self):
 
@@ -502,20 +507,23 @@ class _map():
         substantially faster. """
 
         """
-        Also, the algorithm of Guauss-Seidel could be
+        Also, the algorithm of Gauss-Seidel could be
         implemented instead (explicit loop). However,
         this requires an implementation in cpython or
         some pre-compilation with optimisation.
         """        
         
         """
-        Another thing. It may be worth invertigate the
+        Another thing. It may be worth investigate the
         use of the graphic card ability of processing
         these operations very fast: like operation on
         images. All the computation are linear and most
         likely can be handled very fast by a graphics
         card.
         """
+
+        """ check for sub map and setup boundaries between 
+        map interfaces """
 
         # compute shifted arrays
         l = copy(self.D[+1:-1, 0:-2]) # left
@@ -528,7 +536,7 @@ class _map():
         """ should be able to reduce the number of divisions
         by summing first and dividing (double shifting) only
         once after. However, be aware of the possible overflow
-        of our unsigned interger type. This could work if we
+        of our unsigned integer type. This could work if we
         divided MV by a factor four. That would prevent a
         possible overflow: the idea needs to be tested.
         """
@@ -544,7 +552,7 @@ class DiskSolid():
     # parameters
     def __init__(self, r):
 
-        if VERBOSE: print("instanciate 'DiskSolid'")
+        if VERBOSE: print("instantiate 'DiskSolid'")
 
         # record parameters
         self.l, self.r = -r, +r
@@ -868,7 +876,7 @@ def selectfigure(name):
     return fg, ax
 
 def selectmapfigure(name):
-    # map figure is the same as selectfigure
+    # map figure is the same as selectfigure()
     # but adds an extra axis for a side colour bar
     # it also returns an extra axis
     if not fignum_exists(name): 
@@ -893,7 +901,7 @@ def selectmapfigure(name):
 
 def showResolution(solver, ax):
     # get the mesh coordinates
-    X, Y = solver.mesh
+    X, Y = solver.meshgrid()
     # show resolution visually
     nx, ny = solver.nn
     lx, ly = solver.ll
@@ -914,15 +922,15 @@ def vplot(solver, figname, mapname, *args, **kwargs):
     # create/select a map figure
     fg, ax, bx = selectmapfigure(figname)
     # get the mesh coordinates
-    X, Y = solver.mesh
+    X, Y = solver.meshgrid()
     # get normalised data without the edges
     D = solver.M[mapname].D[1:-1, 1:-1] / MV
     # create filled contour map
-    QCS = ax.contourf(X, Y, D, 32, *args, **kwargs)
+    QCS = ax.contourf(X, Y, D, *args, **kwargs)
     # adjust ticks
     lx, ly = solver.ll
-    MX, SX = _getTickPositions(-solver.lx/2.0, +solver.lx/2.0, 9)
-    MY, SY = _getTickPositions(-solver.ly/2.0, +solver.ly/2.0, 9)
+    MX, SX = _getTickPositions(-lx/2.0, +lx/2.0, 9)
+    MY, SY = _getTickPositions(-ly/2.0, +ly/2.0, 9)
     ax.set_xticks(MX)
     ax.set_yticks(MY)
     # create the colour bar
@@ -941,15 +949,15 @@ def mplot(solver, figname, mapname):
     # create/select a map figure
     fg, ax, bx = selectmapfigure(figname)
     # get the mesh coordinates
-    X, Y = solver.mesh
+    X, Y = solver.meshgrid()
     # get normalised data without the edges
     D = solver.M[mapname].D[1:-1, 1:-1] / MV
     # create filled contour map
     QCS = ax.pcolormesh(X, Y, D, shading = 'auto', rasterized = True)
     # adjust ticks
     lx, ly = solver.ll
-    MX, SX = _getTickPositions(-solver.lx/2.0, +solver.lx/2.0, 9)
-    MY, SY = _getTickPositions(-solver.ly/2.0, +solver.ly/2.0, 9)
+    MX, SX = _getTickPositions(-lx/2.0, +lx/2.0, 9)
+    MY, SY = _getTickPositions(-ly/2.0, +ly/2.0, 9)
     ax.set_xticks(MX)
     ax.set_yticks(MY)
     # create the colour bar
@@ -969,8 +977,8 @@ def headerText(text, fg):
     x, y = (1-w)/2, (1-h)/2
     tx = fg.text(x+w/2, 3*y/2+h, text)
     tx.set_fontfamily('monospace')
-    tx.set_horizontalalignment('center')
-    tx.set_verticalalignment('center')
+    tx.set_horizontalalignment('centre')
+    tx.set_verticalalignment('centre')
     tx.set_fontsize('large')
     return tx
 
@@ -979,12 +987,12 @@ def footerText(text, fg):
     x, y = (1-w)/2, (1-h)/2
     tx = fg.text(x+w/2, y/2, text)
     tx.set_fontfamily('monospace')
-    tx.set_horizontalalignment('center')
-    tx.set_verticalalignment('center')
+    tx.set_horizontalalignment('centre')
+    tx.set_verticalalignment('centre')
     tx.set_fontsize('large')
     return tx
 
-###############################################################################
+#####################################################################
 
 SELECT = [
     "SERIES-CONVERGENCE",  # 0
@@ -1149,7 +1157,23 @@ if __name__ == "__main__":
 
         D.closedocument()
 
-
     if SELECT == "MULTI-GRID":
 
-        print("...")
+        S = SolverTwoDimensions(n = 30, l = 2.0)
+
+        S.addPart("S", DiskAperture(0.95))
+        S.addPart("C", PlateSolid(0.0, 0.0, 0.1, 0.1))
+        
+        for i in range(2000):
+            S.M["C"].jacobiStep()
+            S.M["S"].jacobiStep()
+
+        mplot(S, "P1", "C")
+        mplot(S, "P2", "S")
+
+        D = Document()
+        D.opendocument("../local/plot.pdf")
+
+        for p in ["P1", "P2"]: D.exportfigure(p)
+
+        D.closedocument()
