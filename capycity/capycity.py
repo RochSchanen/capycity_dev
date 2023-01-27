@@ -1159,21 +1159,24 @@ if __name__ == "__main__":
 
     if SELECT == "MULTI-GRID":
 
+        # INIT SOLVER
         S = SolverTwoDimensions(n = 30, l = 2.0)
 
+        # ADD TWO PARTS
         S.addPart("S", DiskAperture(0.95))
         S.addPart("C", PlateSolid(0.0, 0.0, 0.1, 0.1))
         
+        # JACOBI STEPS
         for i in range(2000):
             S.M["C"].jacobiStep()
             S.M["S"].jacobiStep()
 
+        # DISPLAY
         mplot(S, "P1", "C")
         mplot(S, "P2", "S")
 
+        # BUILD PDF
         D = Document()
         D.opendocument("../local/plot.pdf")
-
         for p in ["P1", "P2"]: D.exportfigure(p)
-
         D.closedocument()
