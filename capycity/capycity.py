@@ -1,7 +1,11 @@
 
 # DEBUG DISPLAY
-VERBOSE     = False
+VERBOSE     = True
 VERBOSE_MAP = False
+
+# TIME RESSOURCE
+from time import time
+time_start = time()
 
 # (TBI) means "to be implemented"
 
@@ -152,12 +156,12 @@ class SolverTwoDimensions():
         """
         if VERBOSE: print(f"new map '{name.upper()}'")
         # instantiate new map for this part
-        self.M[name] = _map(self.nn, self.ll)
+        self.M[f"{name}{0:03}"] = _map(self.nn, self.ll)
         # build a CLEAR mask for this part
         for k in self.M.keys():
             if k == name: continue
             # merge CLEAR maps from other parts
-            self.M[name].C &= invert(self.M[k].A)
+            self.M[f"{name}{0:03}"].C &= invert(self.M[k].A)
         # add an anchor mask if already provided
         if mask == None: return
         self.addMask(name, mask)
@@ -166,15 +170,81 @@ class SolverTwoDimensions():
 
     def addMask(self, name, mask):                                # +
         # add new mask
-        self.M[name].addNewAnchor(mask)
+        self.M[f"{name}{0:03}"].addNewAnchor(mask)
         # update CLEAR masks of other parts
-        I = invert(self.M[name].A)
+        I = invert(self.M[f"{name}{0:03}"].A)
         for k in self.M.keys():
             if k == name: continue
             # merge with other parts
             self.M[k].C &= I
         # done
         return
+
+    def addSubMap(self, L):
+
+        if VERBOSE: print("add sub map")
+
+        # get array size (without edges)
+        nx, ny = self.nn
+
+        # get array length
+        lx, ly = self.ll
+
+        # compute index origin
+        ox = (nx + 1.0) / 2.0
+        oy = (ny + 1.0) / 2.0
+
+        # compute intervals
+        ax = lx / nx
+        ay = ly / ny
+        
+        # debug
+        if VERBOSE: print(f"nx ny lx ly ox oy = ", end ='')
+        if VERBOSE: print(nx, ny, lx, ly, ox, oy)
+
+        # compute binding box
+        l, b = ceil(-L/ax/2+ox), ceil(-L/ay/2+oy)
+        r, t = nx+1-l, ny+1-b
+        """ force right and top to be centre-symmetric. There
+        must be some function to fix the typecasting. """
+
+        if VERBOSE: print(f"l, r, t, b = ", end = '')
+        if VERBOSE: print(f"{l}, {r}, {t}, {b}")
+
+        #################### DEBUG ####################
+        ll, rr = -L/2, +L/2
+        tt, bb = +L/2, -L/2
+        print((ll, bb), rr-ll, tt-bb)
+        R0 = Rectangle((ll, bb), rr-ll, tt-bb,
+                    edgecolor = (1.0, 0.6, 0.6),
+                    linestyle = "-.",# line style
+                    fill      = False,
+                    linewidth = 1,
+                    )
+        
+        ll, rr = ax*(l-0.5-ox), ax*(r+0.5-ox)
+        tt, bb = ay*(t+0.5-oy), ax*(b-0.5-oy)
+        print((ll, bb), rr-ll, tt-bb)
+        R1 = Rectangle((ll, bb), rr-ll, tt-bb,
+                    edgecolor = (0.6, 0.6, 0.6),
+                    linestyle = "-.",# line style
+                    fill      = False,
+                    linewidth = 1,
+                    )
+
+        ll, rr = ax*(l+0.5-ox), ax*(r-0.5-ox)
+        tt, bb = ay*(t-0.5-oy), ax*(b+0.5-oy)
+        print((ll, bb), rr-ll, tt-bb)
+        R2 = Rectangle((ll, bb), rr-ll, tt-bb,
+                    edgecolor = (0.6, 0.6, 0.6),
+                    linestyle = "-.",
+                    fill      = False,
+                    linewidth = 1,
+                    )
+        #################### DEBUG ####################
+
+        # done
+        return R0, R1, R2
 
     def jacobiSteps(self, n, name1, name2, SavePattern = None):   # +
         """ Perform a series of "n" Jacobi steps on the
@@ -208,6 +278,20 @@ class SolverTwoDimensions():
             return self.computeCapacitance(name1, name2)
         # return saved data
         return K, C
+
+    def meshgrid(self):                                           # +
+        # get grid sizes
+        nx, ny = self.nn
+        # get grid lengths
+        lx, ly = self.ll
+        # intervals
+        dx, dy = lx / nx, ly / ny
+        # boundaries
+        bx, by = (lx - dx) / 2.0, (ly - dy) / 2.0
+        # domains
+        Dx, Dy = linspace(-bx, +bx, nx), linspace(-by, +by, ny)
+        # done
+        return meshgrid(Dx, Dy)
 
     def jacobiStepSeries(self, S, C1, C2, n = 500):               # !
         """ S is a list of step series numbers. After each step
@@ -254,20 +338,6 @@ class SolverTwoDimensions():
         # done 
         return K, C
 
-    def meshgrid(self):                                           # !
-        # get grid sizes
-        nx, ny = self.nn
-        # get grid lengths
-        lx, ly = self.ll
-        # intervals
-        dx, dy = lx / nx, ly / ny
-        # boundaries
-        bx, by = (lx - dx) / 2.0, (ly - dy) / 2.0
-        # domains
-        Dx, Dy = linspace(-bx, +bx, nx), linspace(-by, +by, ny)
-        # done
-        return meshgrid(Dx, Dy)
-
     def computegradient(self, name):                              # !
         """ The electric field is directly computed
         as the gradient of the electric scalar potential """
@@ -276,9 +346,9 @@ class SolverTwoDimensions():
         # compute intervals
         dx, dy = lx / nx, ly / ny
         # compute gradient without edges
-        dDy, dDx = gradient(self.M[name].D[1:-1, 1:-1] / MV)
+        dDy, dDx = gradient(self.M[f"{name}{0:03}"].D[1:-1, 1:-1] / MV)
         # fix units and record gradient without edges
-        self.M[name].dD = dDx / dx, dDy / dy
+        self.M[f"{name}{0:03}"].dD = dDx / dx, dDy / dy
         # done
         return
 
@@ -381,14 +451,6 @@ class SolverTwoDimensions():
         # done
         return
 
-    def addSubMap(self, l):                                       # !
-
-        """ add a new sub-map to all existing parts. the size is 
-        computed from l. the new map is square and centred. """
-
-        # done
-        return    
-
 class _map():
 
     def __init__(self, nn, ll):
@@ -409,10 +471,11 @@ class _map():
         # debug
         if VERBOSE_MAP: print(f"map:")
         if VERBOSE_MAP: print(f"{self.D}")
-        """ extend display to sub-maps """
-        # declare mask functions list
+        # sub-map
+        self.S = None
+        # mask generator method(s)
         self.M = None
-        # gradient map storage
+        # gradient map
         self.dD = None
         # done
         return
@@ -722,6 +785,8 @@ class PlateSolid():
             linestyle = "--",               # line style
             fill        = False,            # no filling
             )
+        # debug
+        if VERBOSE: print(R)
         # done
         return R
 
@@ -902,14 +967,16 @@ def selectmapfigure(name):
 def showResolution(solver, ax):
     # get the mesh coordinates
     X, Y = solver.meshgrid()
-    # show resolution visually
+    # get geometry
     nx, ny = solver.nn
     lx, ly = solver.ll
     dx, dy = lx / nx, ly / ny
-    # for i, j in [(0, 0), (0, -1), (-1, 0), (-1, -1)]:
+    # loop through four corners
     for i, j in [(1, 1), (1, -2), (-2, 1), (-2, -2)]:
+        # compute coordinates of a rectangle of size dx, dy
         x, y = X[i, j], Y[i, j]
         l, r, t, b = x-dx/2, x+dx/2, y+dy/2, y-dy/2
+        # display the patch
         ax.add_patch(Rectangle((l, b), dx, dy,
             edgecolor   = "gainsboro",
             facecolor   = "gainsboro",
@@ -1001,6 +1068,8 @@ SELECT = [
     ][2]
 
 if __name__ == "__main__":
+
+    time_compute = time()
 
     if SELECT == "CONVERGENCE":
         
@@ -1159,24 +1228,31 @@ if __name__ == "__main__":
 
     if SELECT == "MULTI-GRID":
 
+
         # INIT SOLVER
-        S = SolverTwoDimensions(n = 30, l = 2.0)
+        S = SolverTwoDimensions(n = 20, l = 1.0)
 
-        # ADD TWO PARTS
-        S.addPart("S", DiskAperture(0.95))
-        S.addPart("C", PlateSolid(0.0, 0.0, 0.1, 0.1))
+        # ADD PARTS
+        S.addPart("C", PlateSolid(0.0, 0.0, 0.10, 0.10))
+        S.addPart("S", DiskAperture(0.43))
         
-        # JACOBI STEPS
-        for i in range(2000):
-            S.M["C"].jacobiStep()
-            S.M["S"].jacobiStep()
+        for i in range(500):
+            S.M["C000"].jacobiStep()
 
-        # DISPLAY
-        mplot(S, "P1", "C")
-        mplot(S, "P2", "S")
+        fg, ax, bx = mplot(S, "P1", "C000")
+
+        R0, R1, R2 = S.addSubMap(0.44)
+        ax.add_artist(R0)
+        ax.add_artist(R1)
+        ax.add_artist(R2)
 
         # BUILD PDF
         D = Document()
         D.opendocument("../local/plot.pdf")
-        for p in ["P1", "P2"]: D.exportfigure(p)
+        for p in ["P1"]: D.exportfigure(p)
         D.closedocument()
+
+    # done
+    time_done = time()
+    print(f"load in {time_compute - time_start}s")
+    print(f"compute in {time_done - time_compute}s")
