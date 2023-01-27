@@ -125,7 +125,7 @@ class SolverTwoDimensions():
         if VERBOSE: print(f"lx = {lx}, ly = {ly}")
 
         # MAPS AND MASKS
-        self.M = {} 
+        self.M = {}
         """ Masks define the geometry of the conducting parts
         that compose the the capacitance to compute. There is
         one potential field map to be evaluated per part. New
