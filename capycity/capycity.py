@@ -61,6 +61,7 @@ from numpy import gradient
 from numpy import meshgrid
 from numpy import sum as SUM
 from numpy import multiply as MLT
+from numpy.random import rand
 
 # from package "https://python-pillow.org/"
 from PIL import Image
@@ -93,6 +94,20 @@ ZV, MV = array([0, -1], _DT)
 """ Extrema are computed here. The maximum value might have to be
 decreased by a factor 4 in order to prevent overflowing events
 during the evaluation of some optimised algorithms. """
+
+def mesh(nn, ll):                                           # +
+    # get grid sizes
+    nx, ny = nn
+    # get grid lengths
+    lx, ly = ll
+    # intervals
+    dx, dy = lx / nx, ly / ny
+    # boundaries
+    bx, by = (lx - dx) / 2.0, (ly - dy) / 2.0
+    # domains
+    Dx, Dy = linspace(-bx, +bx, nx), linspace(-by, +by, ny)
+    # done
+    return meshgrid(Dx, Dy)
 
 class SolverTwoDimensions():
 
@@ -156,12 +171,12 @@ class SolverTwoDimensions():
         """
         if VERBOSE: print(f"new map '{name.upper()}'")
         # instantiate new map for this part
-        self.M[f"{name}{0:03}"] = _map(self.nn, self.ll)
+        self.M[f"{name}"] = _map(self.nn, self.ll)
         # build a CLEAR mask for this part
         for k in self.M.keys():
             if k == name: continue
             # merge CLEAR maps from other parts
-            self.M[f"{name}{0:03}"].C &= invert(self.M[k].A)
+            self.M[f"{name}"].C &= invert(self.M[k].A)
         # add an anchor mask if already provided
         if mask == None: return
         self.addMask(name, mask)
@@ -169,82 +184,65 @@ class SolverTwoDimensions():
         return
 
     def addMask(self, name, mask):                                # +
-        # add new mask
-        self.M[f"{name}{0:03}"].addNewAnchor(mask)
-        # update CLEAR masks of other parts
-        I = invert(self.M[f"{name}{0:03}"].A)
+        # add mask to the part
+        self.M[f"{name}"].addNewAnchor(mask)
+        # update the CLEAR masks of other parts:
+        I = invert(self.M[f"{name}"].A)
         for k in self.M.keys():
             if k == name: continue
-            # merge with other parts
             self.M[k].C &= I
         # done
         return
 
-    def addSubMap(self, L):
-
+    def addSubnet(self, L):
         if VERBOSE: print("add sub map")
-
         # get array size (without edges)
         nx, ny = self.nn
-
         # get array length
         lx, ly = self.ll
-
         # compute index origin
         ox = (nx + 1.0) / 2.0
         oy = (ny + 1.0) / 2.0
-
         # compute intervals
         ax = lx / nx
         ay = ly / ny
-        
         # debug
         if VERBOSE: print(f"nx ny lx ly ox oy = ", end ='')
         if VERBOSE: print(nx, ny, lx, ly, ox, oy)
-
         # compute binding box
-        l, b = ceil(-L/ax/2+ox), ceil(-L/ay/2+oy)
+        l, b = int(ceil(-L/ax/2+ox)), int(ceil(-L/ay/2+oy))
         r, t = nx+1-l, ny+1-b
         """ force right and top to be centre-symmetric. There
         must be some function to fix the typecasting. """
-
         if VERBOSE: print(f"l, r, t, b = ", end = '')
         if VERBOSE: print(f"{l}, {r}, {t}, {b}")
-
-        #################### DEBUG ####################
-        ll, rr = -L/2, +L/2
-        tt, bb = +L/2, -L/2
-        print((ll, bb), rr-ll, tt-bb)
-        R0 = Rectangle((ll, bb), rr-ll, tt-bb,
-                    edgecolor = (1.0, 0.6, 0.6),
-                    linestyle = "-.",# line style
-                    fill      = False,
-                    linewidth = 1,
-                    )
-        
-        ll, rr = ax*(l-0.5-ox), ax*(r+0.5-ox)
-        tt, bb = ay*(t+0.5-oy), ax*(b-0.5-oy)
-        print((ll, bb), rr-ll, tt-bb)
-        R1 = Rectangle((ll, bb), rr-ll, tt-bb,
+        # debug
+        R = []
+        if VERBOSE:
+            ll, rr = ax*(l-0.5-ox), ax*(r+0.5-ox)
+            tt, bb = ay*(t+0.5-oy), ax*(b-0.5-oy)
+            print((ll, bb), rr-ll, tt-bb)
+            R.append(Rectangle(
+                    (ll, bb), rr-ll, tt-bb,
                     edgecolor = (0.6, 0.6, 0.6),
                     linestyle = "-.",# line style
                     fill      = False,
                     linewidth = 1,
-                    )
+                ))
 
-        ll, rr = ax*(l+0.5-ox), ax*(r-0.5-ox)
-        tt, bb = ay*(t-0.5-oy), ax*(b+0.5-oy)
-        print((ll, bb), rr-ll, tt-bb)
-        R2 = Rectangle((ll, bb), rr-ll, tt-bb,
-                    edgecolor = (0.6, 0.6, 0.6),
-                    linestyle = "-.",
-                    fill      = False,
-                    linewidth = 1,
-                    )
-        #################### DEBUG ####################
+        # set subnet geometry
+        nx, ny = r-l+1, t+1-b
+        if VERBOSE: print(nx, ny)
+        lx, ly = ax*nx, ax*ny
+        if VERBOSE: print(lx, ly)
+        # double resolution
+        nx, ny = 2*nx, 2*ny
+        # set subnet geometry
+        for k in self.M.keys():
+            self.M[k].S = _map([nx, ny], [lx, ly])
 
         # done
-        return R0, R1, R2
+        return l, r, t, b, R
 
     def jacobiSteps(self, n, name1, name2, SavePattern = None):   # +
         """ Perform a series of "n" Jacobi steps on the
@@ -278,20 +276,6 @@ class SolverTwoDimensions():
             return self.computeCapacitance(name1, name2)
         # return saved data
         return K, C
-
-    def meshgrid(self):                                           # +
-        # get grid sizes
-        nx, ny = self.nn
-        # get grid lengths
-        lx, ly = self.ll
-        # intervals
-        dx, dy = lx / nx, ly / ny
-        # boundaries
-        bx, by = (lx - dx) / 2.0, (ly - dy) / 2.0
-        # domains
-        Dx, Dy = linspace(-bx, +bx, nx), linspace(-by, +by, ny)
-        # done
-        return meshgrid(Dx, Dy)
 
     def jacobiStepSeries(self, S, C1, C2, n = 500):               # !
         """ S is a list of step series numbers. After each step
@@ -346,9 +330,9 @@ class SolverTwoDimensions():
         # compute intervals
         dx, dy = lx / nx, ly / ny
         # compute gradient without edges
-        dDy, dDx = gradient(self.M[f"{name}{0:03}"].D[1:-1, 1:-1] / MV)
+        dDy, dDx = gradient(self.M[f"{name}"].D[1:-1, 1:-1] / MV)
         # fix units and record gradient without edges
-        self.M[f"{name}{0:03}"].dD = dDx / dx, dDy / dy
+        self.M[f"{name}"].dD = dDx / dx, dDy / dy
         # done
         return
 
@@ -463,7 +447,9 @@ class _map():
         # debug
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
         # create new data map (potential between conductors)
-        self.D = full([nx+2, ny+2], ZV, _DT)
+        # self.D = full([nx+2, ny+2], ZV, _DT)
+        self.D = MV*rand(nx+2, ny+2)
+        self.D = self.D.astype(_DT)
         # create new CLEAR map (zero potential from other parts)
         self.C = full([nx+2, ny+2], MV, _DT)
         # create new anchor map (unit potential from this part)
@@ -965,12 +951,11 @@ def selectmapfigure(name):
     return fg, ax, bx
 
 def showResolution(solver, ax):
-    # get the mesh coordinates
-    X, Y = solver.meshgrid()
     # get geometry
     nx, ny = solver.nn
     lx, ly = solver.ll
     dx, dy = lx / nx, ly / ny
+    X, Y = mesh(solver.nn, solver.ll)
     # loop through four corners
     for i, j in [(1, 1), (1, -2), (-2, 1), (-2, -2)]:
         # compute coordinates of a rectangle of size dx, dy
@@ -989,7 +974,7 @@ def vplot(solver, figname, mapname, *args, **kwargs):
     # create/select a map figure
     fg, ax, bx = selectmapfigure(figname)
     # get the mesh coordinates
-    X, Y = solver.meshgrid()
+    X, Y = mesh(solver.nn, solver.ll)
     # get normalised data without the edges
     D = solver.M[mapname].D[1:-1, 1:-1] / MV
     # create filled contour map
@@ -1016,7 +1001,7 @@ def mplot(solver, figname, mapname):
     # create/select a map figure
     fg, ax, bx = selectmapfigure(figname)
     # get the mesh coordinates
-    X, Y = solver.meshgrid()
+    X, Y = mesh(solver.nn, solver.ll)
     # get normalised data without the edges
     D = solver.M[mapname].D[1:-1, 1:-1] / MV
     # create filled contour map
@@ -1038,6 +1023,17 @@ def mplot(solver, figname, mapname):
     showResolution(solver, ax)
     # done
     return fg, ax, bx
+
+def splot(m):
+    # get the mesh coordinates
+    X, Y = mesh(m.nn, m.ll)
+    # get normalised data without the edges
+    D = m.D[1:-1, 1:-1] / MV
+    # create filled contour map
+    QCS = ax.pcolormesh(X, Y, D, shading = 'auto', rasterized = True)
+    # set colour map
+    QCS.set_cmap(cm.inferno)
+    return
 
 def headerText(text, fg):
     w, h = array([1, 1 / 1.4143])*0.7
@@ -1237,14 +1233,15 @@ if __name__ == "__main__":
         S.addPart("S", DiskAperture(0.43))
         
         for i in range(500):
-            S.M["C000"].jacobiStep()
+            S.M["C"].jacobiStep()
 
-        fg, ax, bx = mplot(S, "P1", "C000")
+        print(S.nn, S.ll)
+        fg, ax, bx = mplot(S, "P1", "C")
 
-        R0, R1, R2 = S.addSubMap(0.44)
-        ax.add_artist(R0)
-        ax.add_artist(R1)
-        ax.add_artist(R2)
+        r, l, t, b, DECORS = S.addSubnet(0.45)
+        for d in DECORS: ax.add_artist(d)
+        
+        splot(S.M["C"].S)
 
         # BUILD PDF
         D = Document()
