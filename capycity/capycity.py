@@ -488,15 +488,15 @@ class _map():
         return
 
     def getboundary(self):
-        """ the outer layers of the current map are
-        averaged and returned to the caller """
-
+        """ the outer layers of the
+        current map are averaged and
+        returned to the caller """
         # left
         l  = self.D[1:-1:2, +1]//4
         l += self.D[2:-1:2, +1]//4
         l += self.D[1:-1:2, +2]//4
         l += self.D[2:-1:2, +2]//4
-        # right
+        # # # right
         r  = self.D[1:-1:2, -2]//4
         r += self.D[2:-1:2, -2]//4
         r += self.D[1:-1:2, -3]//4
@@ -519,21 +519,20 @@ class _map():
         and set to the outer boundary of this map. If this method
         is never called, the outer boundary is left at the the
         zero value ZV by default. """
-
         # left
-        self.D[1:-1:2,  0] = l
-        self.D[2:-1:2,  0] = l
+        self.D[1:-1:2, 0] = l
+        self.D[2:-1:2, 0] = l
         # right
         self.D[1:-1:2, -1] = r
         self.D[2:-1:2, -1] = r
         # top
-        self.D[ 0, 1:-1:2] = t
-        self.D[ 0, 2:-1:2] = t
-        # top
         self.D[-1, 1:-1:2] = t
         self.D[-1, 2:-1:2] = t
+        # bottom
+        self.D[0, 1:-1:2] = b
+        self.D[0, 2:-1:2] = b
         # done
-        return        
+        return
 
     def applyMasks(self):
 
@@ -630,10 +629,10 @@ class _map():
         # make decor
         c = Rectangle(
                 (l, b), r-l, t-b,
-                edgecolor = (0.6, 0.2, 0.2),
+                edgecolor = (0.8, 0.4, 0.4),
                 linestyle = "-.",# line style
                 fill      = False,
-                linewidth = 2,
+                linewidth = 1,
             )
         return c
 
@@ -1046,7 +1045,11 @@ def mplot(solver, figname, mapname):
     # get normalised data without the edges
     D = solver.M[mapname].D[1:-1, 1:-1] / MV
     # create filled contour map
-    QCS = ax.pcolormesh(X, Y, D, shading = 'auto', rasterized = True)
+    QCS = ax.pcolormesh(
+        X, Y, D, 
+        vmin = 0.0, vmax = 1.0,
+        shading = 'auto',
+        rasterized = True)
     # adjust ticks
     lx, ly = solver.ll
     MX, SX = _getTickPositions(-lx/2.0, +lx/2.0, 9)
@@ -1068,11 +1071,14 @@ def mplot(solver, figname, mapname):
 def splot(m):
     # get the mesh coordinates
     X, Y = mesh(m.nn, m.ll)
-    # Y += 0.5
     # get normalised data without the edges
     D = m.D[1:-1, 1:-1] / MV
     # create filled contour map
-    QCS = ax.pcolormesh(X, Y, D, shading = 'auto', rasterized = True)
+    QCS = ax.pcolormesh(
+        X, Y, D,
+        vmin = 0.0, vmax = 1.0,
+        shading = 'auto', 
+        rasterized = True)
     # set colour map
     QCS.set_cmap(cm.inferno)
     return
@@ -1267,19 +1273,15 @@ if __name__ == "__main__":
 
     if SELECT == "MULTI-GRID":
 
-
         # INIT SOLVER
-        S = SolverTwoDimensions(n = 20, l = 1.0)
+        S = SolverTwoDimensions(n = 64, l = 2.0)
 
         # ADD PARTS
-        S.addPart("C", PlateSolid(0.0, 0.0, 0.25, 0.05))
-        S.addPart("S", DiskAperture(0.43))
+        S.addPart("C", PlateSolid(0.0, 0.0, 0.10, 0.05))
+        S.addPart("S", DiskAperture(0.90))
         S.addSubnet(0.40)
         
-        for i in range(1000):
-
-            D0 = S.M["C"].D
-            D1 = S.M["C"].S.D
+        for i in range(20000):
 
             mx, my = S.M["C"].nn
             nx, ny = S.M["C"].S.nn
@@ -1289,21 +1291,21 @@ if __name__ == "__main__":
  
             l, r, t, b = S.M["C"].S.getboundary()
 
-            D0[py:-py, px   ] = l 
-            D0[py:-py, mx-px] = r
-            D0[py,    px:-px] = t 
-            D0[my-py, px:-px] = b
+            S.M["C"].D[py:-py,      px] = l
+            S.M["C"].D[py:-py, mx-px+1] = r
+            S.M["C"].D[my-py+1, px:-px] = t
+            S.M["C"].D[py,      px:-px] = b
 
-            l = D0[py:-py,  px-1]
-            r = D0[py:-py,  mx-px+1]
-            
-            t = D0[py-1,    px:-px]
-            b = D0[my-py+1, px:-px]
+            l = S.M["C"].D[py:-py,  px-1]
+            r = S.M["C"].D[py:-py,  mx-px+2]
+            t = S.M["C"].D[py-1,    px:-px]
+            b = S.M["C"].D[my-py+2, px:-px]
 
             S.M["C"].S.setboundary(l, r, t, b)
 
             S.M["C"].jacobiStep()
             S.M["C"].S.jacobiStep()
+
             S.M["S"].jacobiStep()
             S.M["S"].S.jacobiStep()
 
