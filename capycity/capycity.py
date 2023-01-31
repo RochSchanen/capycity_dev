@@ -95,7 +95,7 @@ ZV, MV = array([0, -1], _DT)
 decreased by a factor 4 in order to prevent overflowing events
 during the evaluation of some optimised algorithms. """
 
-def mesh(nn, ll):                                           # +
+def mesh(nn, ll):                                                 # +
     # get grid sizes
     nx, ny = nn
     # get grid lengths
@@ -194,55 +194,52 @@ class SolverTwoDimensions():
         # done
         return
 
-    def addSubnet(self, L):
-        if VERBOSE: print("add sub map")
-        # get array size (without edges)
+    def addSubnet(self, L):                                       # !
+
+        if VERBOSE: print("subnet")
+
+        # get current geometry
         nx, ny = self.nn
-        # get array length
         lx, ly = self.ll
-        # compute index origin
         ox = (nx + 1.0) / 2.0
         oy = (ny + 1.0) / 2.0
-        # compute intervals
         ax = lx / nx
         ay = ly / ny
-        # debug
-        if VERBOSE: print(f"nx ny lx ly ox oy = ", end ='')
-        if VERBOSE: print(nx, ny, lx, ly, ox, oy)
-        # compute binding box
+
+        # new binding box
         l, b = int(ceil(-L/ax/2+ox)), int(ceil(-L/ay/2+oy))
         r, t = nx+1-l, ny+1-b
-        """ force right and top to be centre-symmetric. There
-        must be some function to fix the typecasting. """
-        if VERBOSE: print(f"l, r, t, b = ", end = '')
-        if VERBOSE: print(f"{l}, {r}, {t}, {b}")
-        # debug
-        R = []
-        if VERBOSE:
-            ll, rr = ax*(l-0.5-ox), ax*(r+0.5-ox)
-            tt, bb = ay*(t+0.5-oy), ax*(b-0.5-oy)
-            print((ll, bb), rr-ll, tt-bb)
-            R.append(Rectangle(
-                    (ll, bb), rr-ll, tt-bb,
-                    edgecolor = (0.6, 0.6, 0.6),
-                    linestyle = "-.",# line style
-                    fill      = False,
-                    linewidth = 1,
-                ))
+        """ force the right and top values to be centre-symmetric
+        in relatition to the left and bottom values. """
+        if VERBOSE: print(l, r, t, b)
 
         # set subnet geometry
         nx, ny = r-l+1, t+1-b
         if VERBOSE: print(nx, ny)
         lx, ly = ax*nx, ax*ny
         if VERBOSE: print(lx, ly)
-        # double resolution
+        # double the resolution by increasing the
+        # grid sizes and keeping the same lengths
         nx, ny = 2*nx, 2*ny
-        # set subnet geometry
+        
+        # create subnet maps and anchor masks
         for k in self.M.keys():
             self.M[k].S = _map([nx, ny], [lx, ly])
+            # duplicate anchor mask instance (by ref?)
+            self.M[k].S.addNewAnchor(self.M[k].M)
+            """ anchors are created automatically
+            with the addNewAnchor() method """
+
+        # build subnet clear masks
+        for k in self.M.keys():
+            # loop though all the parts but k
+            for l in self.M.keys():
+                if k == l: continue
+                # merge masks
+                self.M[k].S.C &= invert(self.M[l].S.A)
 
         # done
-        return l, r, t, b, R
+        return
 
     def jacobiSteps(self, n, name1, name2, SavePattern = None):   # +
         """ Perform a series of "n" Jacobi steps on the
@@ -437,7 +434,7 @@ class SolverTwoDimensions():
 
 class _map():
 
-    def __init__(self, nn, ll):
+    def __init__(self, nn, ll):                                   # !
         """ GENERAL DESCRIPTION """
         if VERBOSE: print(f"instantiate '_map'")
         # save parameters locally
@@ -447,9 +444,9 @@ class _map():
         # debug
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
         # create new data map (potential between conductors)
-        # self.D = full([nx+2, ny+2], ZV, _DT)
-        self.D = MV*rand(nx+2, ny+2)
-        self.D = self.D.astype(_DT)
+        self.D = full([nx+2, ny+2], ZV, _DT)
+        # fill the initial value with random values
+        # self.D[1:-1, 1:-1] = (MV*rand(nx, ny)).astype(_DT)
         # create new CLEAR map (zero potential from other parts)
         self.C = full([nx+2, ny+2], MV, _DT)
         # create new anchor map (unit potential from this part)
@@ -466,7 +463,7 @@ class _map():
         # done
         return
 
-    def addNewAnchor(self, mask):                                 # -
+    def addNewAnchor(self, mask):                                 # !
         # register a new mask
         self.M = mask
         # self.M.append(mask)
@@ -478,7 +475,7 @@ class _map():
         # done
         return
 
-    def buildAnchorMask(self):                                    # -
+    def buildAnchorMask(self):                                    # !
         # MERGE ANCHOR MAPS
         self.A = self.M.mask(self.nn, self.ll)
         # self.A |= self.M.mask(nn, ll)
@@ -491,21 +488,50 @@ class _map():
         return
 
     def getboundary(self):
+        """ the outer layers of the current map are
+        averaged and returned to the caller """
 
-        l, r, t, b = None, None, None, None
-        """ the outer layers of the map are averaged and returned to
-        the calling map. """
-        
+        # left
+        l  = self.D[1:-1:2, +1]//4
+        l += self.D[2:-1:2, +1]//4
+        l += self.D[1:-1:2, +2]//4
+        l += self.D[2:-1:2, +2]//4
+        # right
+        r  = self.D[1:-1:2, -2]//4
+        r += self.D[2:-1:2, -2]//4
+        r += self.D[1:-1:2, -3]//4
+        r += self.D[2:-1:2, -3]//4
+        # top
+        t  = self.D[+1, 1:-1:2]//4
+        t += self.D[+1, 2:-1:2]//4
+        t += self.D[+2, 1:-1:2]//4
+        t += self.D[+2, 2:-1:2]//4
+        # bottom
+        b  = self.D[-2, 1:-1:2]//4
+        b += self.D[-2, 2:-1:2]//4
+        b += self.D[-3, 1:-1:2]//4
+        b += self.D[-3, 2:-1:2]//4
         # done
         return l, r, t, b
 
     def setboundary(self, l, r, t, b):
+        """ the given boundaries data are automatically centred
+        and set to the outer boundary of this map. If this method
+        is never called, the outer boundary is left at the the
+        zero value ZV by default. """
 
-        """ the given boundaries data are automatically centred and
-        set to the outer boundary of this map. If this method is
-        never called, the outer boundary is left at the the zero value
-        ZV by default. """
-
+        # left
+        self.D[1:-1:2,  0] = l
+        self.D[2:-1:2,  0] = l
+        # right
+        self.D[1:-1:2, -1] = r
+        self.D[2:-1:2, -1] = r
+        # top
+        self.D[ 0, 1:-1:2] = t
+        self.D[ 0, 2:-1:2] = t
+        # top
+        self.D[-1, 1:-1:2] = t
+        self.D[-1, 2:-1:2] = t
         # done
         return        
 
@@ -595,6 +621,21 @@ class _map():
 
         # done
         return
+
+    def decor(self):
+        # get array length
+        lx, ly = self.ll
+        # get boundaries
+        l, r, t, b = -lx/2, +lx/2, +ly/2, -ly/2
+        # make decor
+        c = Rectangle(
+                (l, b), r-l, t-b,
+                edgecolor = (0.6, 0.2, 0.2),
+                linestyle = "-.",# line style
+                fill      = False,
+                linewidth = 2,
+            )
+        return c
 
 class DiskSolid():
 
@@ -1027,6 +1068,7 @@ def mplot(solver, figname, mapname):
 def splot(m):
     # get the mesh coordinates
     X, Y = mesh(m.nn, m.ll)
+    # Y += 0.5
     # get normalised data without the edges
     D = m.D[1:-1, 1:-1] / MV
     # create filled contour map
@@ -1176,7 +1218,8 @@ if __name__ == "__main__":
             31, 6.332311209754091e-11,
             87, 6.048215759261286e-11,
             247, 5.992852197701082e-11,
-            801, 5.971289191392915e-11,
+            801, 5.971289191392915e-11,        # set subnet geometry
+
             2400, 5.967733448169437e-11,
             ],
             [
@@ -1229,24 +1272,54 @@ if __name__ == "__main__":
         S = SolverTwoDimensions(n = 20, l = 1.0)
 
         # ADD PARTS
-        S.addPart("C", PlateSolid(0.0, 0.0, 0.10, 0.10))
+        S.addPart("C", PlateSolid(0.0, 0.0, 0.25, 0.05))
         S.addPart("S", DiskAperture(0.43))
+        S.addSubnet(0.40)
         
-        for i in range(500):
+        for i in range(1000):
+
+            D0 = S.M["C"].D
+            D1 = S.M["C"].S.D
+
+            mx, my = S.M["C"].nn
+            nx, ny = S.M["C"].S.nn
+
+            px = (mx - (nx // 2)) // 2 + 1 # +1 is from the edge
+            py = (my - (ny // 2)) // 2 + 1 # +1 is from the edge
+ 
+            l, r, t, b = S.M["C"].S.getboundary()
+
+            D0[py:-py, px   ] = l 
+            D0[py:-py, mx-px] = r
+            D0[py,    px:-px] = t 
+            D0[my-py, px:-px] = b
+
+            l = D0[py:-py,  px-1]
+            r = D0[py:-py,  mx-px+1]
+            
+            t = D0[py-1,    px:-px]
+            b = D0[my-py+1, px:-px]
+
+            S.M["C"].S.setboundary(l, r, t, b)
+
             S.M["C"].jacobiStep()
+            S.M["C"].S.jacobiStep()
+            S.M["S"].jacobiStep()
+            S.M["S"].S.jacobiStep()
 
-        print(S.nn, S.ll)
         fg, ax, bx = mplot(S, "P1", "C")
-
-        r, l, t, b, DECORS = S.addSubnet(0.45)
-        for d in DECORS: ax.add_artist(d)
-        
+        ax.add_artist(S.M["C"].S.decor())
         splot(S.M["C"].S)
+
+        fg, ax, bx = mplot(S, "P2", "S")
+        ax.add_artist(S.M["S"].S.decor())
+        splot(S.M["S"].S)
 
         # BUILD PDF
         D = Document()
         D.opendocument("../local/plot.pdf")
-        for p in ["P1"]: D.exportfigure(p)
+        for p in ["P1", "P2"]:
+            D.exportfigure(p)
         D.closedocument()
 
     # done
