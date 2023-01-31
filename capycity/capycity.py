@@ -1274,11 +1274,11 @@ if __name__ == "__main__":
     if SELECT == "MULTI-GRID":
 
         # INIT SOLVER
-        S = SolverTwoDimensions(n = 64, l = 2.0)
+        S = SolverTwoDimensions(n = 24, l = 1.5)
 
         # ADD PARTS
         S.addPart("C", PlateSolid(0.0, 0.0, 0.10, 0.05))
-        S.addPart("S", DiskAperture(0.90))
+        S.addPart("S", DiskAperture(0.6))
         S.addSubnet(0.40)
         
         for i in range(20000):
@@ -1310,7 +1310,7 @@ if __name__ == "__main__":
             S.M["S"].S.jacobiStep()
 
         fg, ax, bx = mplot(S, "P1", "C")
-        ax.add_artist(S.M["C"].S.decor())
+        # ax.add_artist(S.M["C"].S.decor())
         splot(S.M["C"].S)
 
         fg, ax, bx = mplot(S, "P2", "S")
