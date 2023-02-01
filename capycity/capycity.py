@@ -599,13 +599,41 @@ class _map():
         """ check for sub map and setup boundaries between 
         map interfaces """
 
+        # link to sub subnet
+        if self.S:
+
+            # get geometry
+            mx, my = self.nn
+            nx, ny = self.S.nn
+            px = (mx - (nx // 2)) // 2 + 1
+            py = (my - (ny // 2)) // 2 + 1
+            """ the + 1 in previous lines is
+            due to the presence of the edge
+            layer. """
+
+            # set inner boundary values from subnet
+            l, r, t, b = self.S.getboundary()
+            self.D[py:-py, px] = l
+            self.D[py:-py, mx-px+1] = r
+            self.D[my-py+1, px:-px] = t
+            self.D[py, px:-px] = b
+
+            # set outer boundary values of subnet
+            l = self.D[py:-py, px-1]
+            r = self.D[py:-py, mx-px+2]
+            t = self.D[py-1, px:-px]
+            b = self.D[my-py+2, px:-px]
+            self.S.setboundary(l, r, t, b)
+
+        # JACOBI STEP:
+
         # compute shifted arrays
         l = copy(self.D[+1:-1, 0:-2]) # left
         r = copy(self.D[+1:-1, 2:  ]) # right
         t = copy(self.D[0:-2, +1:-1]) # top
         b = copy(self.D[2:  , +1:-1]) # bottom
 
-        # compute average (Jacobi step)
+        # compute neighbour average
         self.D[1:-1, 1:-1] = l//4 + r//4 + t//4 + b//4
         """ should be able to reduce the number of divisions
         by summing first and dividing (double shifting) only
@@ -617,6 +645,12 @@ class _map():
 
         # reset boundaries
         self.applyMasks()
+
+        if self.S:
+            # compute all subnet jacobi step:
+            self.S.jacobiStep()
+            """ All subnet maps will be
+            computed recurrently. """
 
         # done
         return
@@ -1277,7 +1311,7 @@ if __name__ == "__main__":
         S = SolverTwoDimensions(n = 32, l = 1.5)
 
         # ADD PARTS
-        S.addPart("C", DiskSolid(0.1))
+        S.addPart("C", DiskSolid(0.15))
         S.addPart("S", DiskAperture(0.65))
         S.addSubnet(0.50)
         
@@ -1285,53 +1319,53 @@ if __name__ == "__main__":
 
             ####################################################
             
-            mx, my = S.M["C"].nn
-            nx, ny = S.M["C"].S.nn
+            # mx, my = S.M["C"].nn
+            # nx, ny = S.M["C"].S.nn
 
-            px = (mx - (nx // 2)) // 2 + 1 # +1 is from the edge
-            py = (my - (ny // 2)) // 2 + 1 # +1 is from the edge
+            # px = (mx - (nx // 2)) // 2 + 1 # +1 is from the edge
+            # py = (my - (ny // 2)) // 2 + 1 # +1 is from the edge
  
-            l, r, t, b = S.M["C"].S.getboundary()
+            # l, r, t, b = S.M["C"].S.getboundary()
 
-            S.M["C"].D[py:-py,      px] = l
-            S.M["C"].D[py:-py, mx-px+1] = r
-            S.M["C"].D[my-py+1, px:-px] = t
-            S.M["C"].D[py,      px:-px] = b
+            # S.M["C"].D[py:-py,      px] = l
+            # S.M["C"].D[py:-py, mx-px+1] = r
+            # S.M["C"].D[my-py+1, px:-px] = t
+            # S.M["C"].D[py,      px:-px] = b
 
-            l = S.M["C"].D[py:-py,  px-1]
-            r = S.M["C"].D[py:-py,  mx-px+2]
-            t = S.M["C"].D[py-1,    px:-px]
-            b = S.M["C"].D[my-py+2, px:-px]
+            # l = S.M["C"].D[py:-py,  px-1]
+            # r = S.M["C"].D[py:-py,  mx-px+2]
+            # t = S.M["C"].D[py-1,    px:-px]
+            # b = S.M["C"].D[my-py+2, px:-px]
 
-            S.M["C"].S.setboundary(l, r, t, b)
+            # S.M["C"].S.setboundary(l, r, t, b)
 
             S.M["C"].jacobiStep()
-            S.M["C"].S.jacobiStep()
+            # S.M["C"].S.jacobiStep()
 
             ####################################################
             
-            mx, my = S.M["S"].nn
-            nx, ny = S.M["S"].S.nn
+            # mx, my = S.M["S"].nn
+            # nx, ny = S.M["S"].S.nn
 
-            px = (mx - (nx // 2)) // 2 + 1 # +1 is from the edge
-            py = (my - (ny // 2)) // 2 + 1 # +1 is from the edge
+            # px = (mx - (nx // 2)) // 2 + 1 # +1 is from the edge
+            # py = (my - (ny // 2)) // 2 + 1 # +1 is from the edge
  
-            l, r, t, b = S.M["S"].S.getboundary()
+            # l, r, t, b = S.M["S"].S.getboundary()
 
-            S.M["S"].D[py:-py,      px] = l
-            S.M["S"].D[py:-py, mx-px+1] = r
-            S.M["S"].D[my-py+1, px:-px] = t
-            S.M["S"].D[py,      px:-px] = b
+            # S.M["S"].D[py:-py,      px] = l
+            # S.M["S"].D[py:-py, mx-px+1] = r
+            # S.M["S"].D[my-py+1, px:-px] = t
+            # S.M["S"].D[py,      px:-px] = b
 
-            l = S.M["S"].D[py:-py,  px-1]
-            r = S.M["S"].D[py:-py,  mx-px+2]
-            t = S.M["S"].D[py-1,    px:-px]
-            b = S.M["S"].D[my-py+2, px:-px]
+            # l = S.M["S"].D[py:-py,  px-1]
+            # r = S.M["S"].D[py:-py,  mx-px+2]
+            # t = S.M["S"].D[py-1,    px:-px]
+            # b = S.M["S"].D[my-py+2, px:-px]
 
-            S.M["S"].S.setboundary(l, r, t, b)
+            # S.M["S"].S.setboundary(l, r, t, b)
 
             S.M["S"].jacobiStep()
-            S.M["S"].S.jacobiStep()
+            # S.M["S"].S.jacobiStep()
 
             ####################################################
 
