@@ -198,45 +198,55 @@ class SolverTwoDimensions():
 
         if VERBOSE: print("subnet")
 
-        # get current geometry
-        nx, ny = self.nn
-        lx, ly = self.ll
-        ox = (nx + 1.0) / 2.0
-        oy = (ny + 1.0) / 2.0
-        ax = lx / nx
-        ay = ly / ny
+        # find all bottom layer subnets
+        S = {}
+        for k in self.M.keys():
+            S[k] = self.S
+            s = self.M[k].S
+            while S[k]:
 
-        # new binding box
-        l, b = int(ceil(-L/ax/2+ox)), int(ceil(-L/ay/2+oy))
-        r, t = nx+1-l, ny+1-b
-        """ force the right and top values to be centre-symmetric
-        in relatition to the left and bottom values. """
-        if VERBOSE: print(l, r, t, b)
+                S[k] = s[k].S
 
-        # set subnet geometry
-        nx, ny = r-l+1, t+1-b
-        if VERBOSE: print(nx, ny)
-        lx, ly = ax*nx, ax*ny
-        if VERBOSE: print(lx, ly)
-        # double the resolution by increasing the
-        # grid sizes and keeping the same lengths
-        nx, ny = 2*nx, 2*ny
+
+        # # get current geometry
+        # nx, ny = S.nn
+        # lx, ly = S.ll
+        # ox = (nx + 1.0) / 2.0
+        # oy = (ny + 1.0) / 2.0
+        # ax = lx / nx
+        # ay = ly / ny
+
+        # # new binding box
+        # l, b = int(ceil(-L/ax/2+ox)), int(ceil(-L/ay/2+oy))
+        # r, t = nx+1-l, ny+1-b
+        # """ force the right and top values to be centre-symmetric
+        # in relatition to the left and bottom values. """
+        # if VERBOSE: print(l, r, t, b)
+
+        # # set subnet geometry
+        # nx, ny = r-l+1, t+1-b
+        # if VERBOSE: print(nx, ny)
+        # lx, ly = ax*nx, ax*ny
+        # if VERBOSE: print(lx, ly)
+        # # double the resolution by increasing the
+        # # grid sizes and keeping the same lengths
+        # nx, ny = 2*nx, 2*ny
         
-        # create subnet maps and anchor masks
-        for k in self.M.keys():
-            self.M[k].S = _map([nx, ny], [lx, ly])
-            # duplicate anchor mask instance (by ref?)
-            self.M[k].S.addNewAnchor(self.M[k].M)
-            """ anchors are created automatically
-            with the addNewAnchor() method """
+        # # create subnet maps and anchor masks
+        # for k in self.M.keys():
+        #     self.M[k].S = _map([nx, ny], [lx, ly])
+        #     # duplicate anchor mask instance (by ref?)
+        #     self.M[k].S.addNewAnchor(self.M[k].M)
+        #     """ anchors are created automatically
+        #     with the addNewAnchor() method """
 
-        # build subnet clear masks
-        for k in self.M.keys():
-            # loop though all the parts but k
-            for l in self.M.keys():
-                if k == l: continue
-                # merge masks
-                self.M[k].S.C &= invert(self.M[l].S.A)
+        # # build subnet clear masks
+        # for k in self.M.keys():
+        #     # loop though all the parts but k
+        #     for l in self.M.keys():
+        #         if k == l: continue
+        #         # merge masks
+        #         self.M[k].S.C &= invert(self.M[l].S.A)
 
         # done
         return
@@ -1313,69 +1323,22 @@ if __name__ == "__main__":
         # ADD PARTS
         S.addPart("C", DiskSolid(0.15))
         S.addPart("S", DiskAperture(0.65))
+        
         S.addSubnet(0.50)
         
         for i in range(500):
-
-            ####################################################
-            
-            # mx, my = S.M["C"].nn
-            # nx, ny = S.M["C"].S.nn
-
-            # px = (mx - (nx // 2)) // 2 + 1 # +1 is from the edge
-            # py = (my - (ny // 2)) // 2 + 1 # +1 is from the edge
- 
-            # l, r, t, b = S.M["C"].S.getboundary()
-
-            # S.M["C"].D[py:-py,      px] = l
-            # S.M["C"].D[py:-py, mx-px+1] = r
-            # S.M["C"].D[my-py+1, px:-px] = t
-            # S.M["C"].D[py,      px:-px] = b
-
-            # l = S.M["C"].D[py:-py,  px-1]
-            # r = S.M["C"].D[py:-py,  mx-px+2]
-            # t = S.M["C"].D[py-1,    px:-px]
-            # b = S.M["C"].D[my-py+2, px:-px]
-
-            # S.M["C"].S.setboundary(l, r, t, b)
-
             S.M["C"].jacobiStep()
-            # S.M["C"].S.jacobiStep()
-
-            ####################################################
-            
-            # mx, my = S.M["S"].nn
-            # nx, ny = S.M["S"].S.nn
-
-            # px = (mx - (nx // 2)) // 2 + 1 # +1 is from the edge
-            # py = (my - (ny // 2)) // 2 + 1 # +1 is from the edge
- 
-            # l, r, t, b = S.M["S"].S.getboundary()
-
-            # S.M["S"].D[py:-py,      px] = l
-            # S.M["S"].D[py:-py, mx-px+1] = r
-            # S.M["S"].D[my-py+1, px:-px] = t
-            # S.M["S"].D[py,      px:-px] = b
-
-            # l = S.M["S"].D[py:-py,  px-1]
-            # r = S.M["S"].D[py:-py,  mx-px+2]
-            # t = S.M["S"].D[py-1,    px:-px]
-            # b = S.M["S"].D[my-py+2, px:-px]
-
-            # S.M["S"].S.setboundary(l, r, t, b)
-
             S.M["S"].jacobiStep()
-            # S.M["S"].S.jacobiStep()
-
-            ####################################################
 
         fg, ax, bx = mplot(S, "P1", "C")
-        ax.add_artist(S.M["C"].S.decor())
-        splot(S.M["C"].S)
+        if S.M["C"].S:
+            ax.add_artist(S.M["C"].S.decor())
+            splot(S.M["C"].S)
 
         fg, ax, bx = mplot(S, "P2", "S")
-        ax.add_artist(S.M["S"].S.decor())
-        splot(S.M["S"].S)
+        if S.M["S"].S:
+            ax.add_artist(S.M["S"].S.decor())
+            splot(S.M["S"].S)
 
         # BUILD PDF
         D = Document()
