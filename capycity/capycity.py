@@ -1274,15 +1274,17 @@ if __name__ == "__main__":
     if SELECT == "MULTI-GRID":
 
         # INIT SOLVER
-        S = SolverTwoDimensions(n = 24, l = 1.5)
+        S = SolverTwoDimensions(n = 32, l = 1.5)
 
         # ADD PARTS
-        S.addPart("C", PlateSolid(0.0, 0.0, 0.10, 0.05))
-        S.addPart("S", DiskAperture(0.6))
-        S.addSubnet(0.40)
+        S.addPart("C", DiskSolid(0.1))
+        S.addPart("S", DiskAperture(0.65))
+        S.addSubnet(0.50)
         
-        for i in range(20000):
+        for i in range(500):
 
+            ####################################################
+            
             mx, my = S.M["C"].nn
             nx, ny = S.M["C"].S.nn
 
@@ -1306,11 +1308,35 @@ if __name__ == "__main__":
             S.M["C"].jacobiStep()
             S.M["C"].S.jacobiStep()
 
+            ####################################################
+            
+            mx, my = S.M["S"].nn
+            nx, ny = S.M["S"].S.nn
+
+            px = (mx - (nx // 2)) // 2 + 1 # +1 is from the edge
+            py = (my - (ny // 2)) // 2 + 1 # +1 is from the edge
+ 
+            l, r, t, b = S.M["S"].S.getboundary()
+
+            S.M["S"].D[py:-py,      px] = l
+            S.M["S"].D[py:-py, mx-px+1] = r
+            S.M["S"].D[my-py+1, px:-px] = t
+            S.M["S"].D[py,      px:-px] = b
+
+            l = S.M["S"].D[py:-py,  px-1]
+            r = S.M["S"].D[py:-py,  mx-px+2]
+            t = S.M["S"].D[py-1,    px:-px]
+            b = S.M["S"].D[my-py+2, px:-px]
+
+            S.M["S"].S.setboundary(l, r, t, b)
+
             S.M["S"].jacobiStep()
             S.M["S"].S.jacobiStep()
 
+            ####################################################
+
         fg, ax, bx = mplot(S, "P1", "C")
-        # ax.add_artist(S.M["C"].S.decor())
+        ax.add_artist(S.M["C"].S.decor())
         splot(S.M["C"].S)
 
         fg, ax, bx = mplot(S, "P2", "S")
