@@ -196,7 +196,7 @@ class SolverTwoDimensions():
 
     def addSubnet(self, L):                                       # !
 
-        if VERBOSE: print("subnet: \n from:")
+        if VERBOSE: print("subnet: \n --- from:")
 
         # build the bottom subnet layer
         S = []
@@ -209,6 +209,8 @@ class SolverTwoDimensions():
             S.append(t)
             #debug
             if VERBOSE: print(k, t.nn, t.ll)
+
+        if VERBOSE: print(" --- to:")
 
         # scan through top and bottom
         # layer and create new layer
@@ -230,12 +232,12 @@ class SolverTwoDimensions():
             values to be centre-symmetric
             in relation to the left and
             bottom values. """
-            if VERBOSE: print(l, r, t, b)
+            if VERBOSE: print("VERBOSE_000:", l, r, t, b)
             # compute new subnet geometry
             nx, ny = r-l+1, t+1-b
             lx, ly = ax*nx, ax*ny
-            if VERBOSE: print(nx, ny)
-            if VERBOSE: print(lx, ly)
+            if VERBOSE: print("VERBOSE_001:", nx, ny)
+            if VERBOSE: print("VERBOSE_002:", lx, ly)
             # increase resolution
             nx, ny = 2*nx, 2*ny
             """ the resolution in increased
@@ -470,19 +472,19 @@ class _map():
         # debug
         if VERBOSE: print(f"nx = {nx}, ny = {ny}")
         # create new data map (potential between conductors)
-        self.D = full([nx+2, ny+2], ZV, _DT)
+        self.D = full([ny+2, nx+2], ZV, _DT)
         # fill the initial value with random values
         # self.D[1:-1, 1:-1] = (MV*rand(nx, ny)).astype(_DT)
         # create new CLEAR map (zero potential from other parts)
-        self.C = full([nx+2, ny+2], MV, _DT)
+        self.C = full([ny+2, nx+2], MV, _DT)
         # create new anchor map (unit potential from this part)
-        self.A = full([nx+2, ny+2], ZV, _DT)
+        self.A = full([ny+2, nx+2], ZV, _DT)
         # debug
         if VERBOSE_MAPDATA: print(f"map:")
         if VERBOSE_MAPDATA: print(f"{self.D}")
         # sub-map
         self.S = None
-        # mask generator method(s)
+        # mask generator methods
         self.M = None
         # done
         return
@@ -520,21 +522,21 @@ class _map():
         l += self.D[2:-1:2, +1]//4
         l += self.D[1:-1:2, +2]//4
         l += self.D[2:-1:2, +2]//4
-        # # # right
+        # right
         r  = self.D[1:-1:2, -2]//4
         r += self.D[2:-1:2, -2]//4
         r += self.D[1:-1:2, -3]//4
         r += self.D[2:-1:2, -3]//4
         # top
-        t  = self.D[+1, 1:-1:2]//4
-        t += self.D[+1, 2:-1:2]//4
-        t += self.D[+2, 1:-1:2]//4
-        t += self.D[+2, 2:-1:2]//4
+        t  = self.D[-2, 1:-1:2]//4
+        t += self.D[-2, 2:-1:2]//4
+        t += self.D[-3, 1:-1:2]//4
+        t += self.D[-3, 2:-1:2]//4
         # bottom
-        b  = self.D[-2, 1:-1:2]//4
-        b += self.D[-2, 2:-1:2]//4
-        b += self.D[-3, 1:-1:2]//4
-        b += self.D[-3, 2:-1:2]//4
+        b  = self.D[+1, 1:-1:2]//4
+        b += self.D[+1, 2:-1:2]//4
+        b += self.D[+2, 1:-1:2]//4
+        b += self.D[+2, 2:-1:2]//4
 
         t = full(len(self.D[1:-1:2, +1]), MV, _DT)
 
@@ -547,8 +549,8 @@ class _map():
         is never called, the outer boundary is left at the the
         zero value ZV by default. """
         # left
-        self.D[1:-1:2, 0] = l
-        self.D[2:-1:2, 0] = l
+        self.D[1:-1:2,  0] = l
+        self.D[2:-1:2,  0] = l
         # right
         self.D[1:-1:2, -1] = r
         self.D[2:-1:2, -1] = r
@@ -556,8 +558,8 @@ class _map():
         self.D[-1, 1:-1:2] = t
         self.D[-1, 2:-1:2] = t
         # bottom
-        self.D[0, 1:-1:2] = b
-        self.D[0, 2:-1:2] = b
+        self.D[ 0, 1:-1:2] = b
+        self.D[ 0, 2:-1:2] = b
         # done
         return
 
@@ -640,25 +642,25 @@ class _map():
 
             # set inner boundary values from subnet
             l, r, t, b = self.S.getboundary()
-            self.D[py:-py, px] = l
-            self.D[py:-py, mx-px+1] = r
-            self.D[my-py+1, px:-px] = t
-            self.D[py, px:-px] = b
+            self.D[py:-py,  px     ] = l
+            self.D[py:-py,  mx-px+1] = r
+            self.D[my-py+1, px:-px ] = t
+            self.D[py,      px:-px ] = b
 
             # set outer boundary values of subnet
-            l = self.D[py:-py, px-1]
-            r = self.D[py:-py, mx-px+2]
-            t = self.D[py-1, px:-px]
-            b = self.D[my-py+2, px:-px]
+            l = self.D[py:-py,  px-1   ]
+            r = self.D[py:-py,  mx-px+2]
+            t = self.D[my-py+2, px:-px ]
+            b = self.D[py-1,    px:-px ]
             self.S.setboundary(l, r, t, b)
 
         # JACOBI STEP:
 
         # compute shifted arrays
-        l = copy(self.D[+1:-1, 0:-2]) # left
-        r = copy(self.D[+1:-1, 2:  ]) # right
-        t = copy(self.D[0:-2, +1:-1]) # top
-        b = copy(self.D[2:  , +1:-1]) # bottom
+        l = copy(self.D[1:-1, 0:-2]) # left
+        r = copy(self.D[1:-1, 2:  ]) # right
+        t = copy(self.D[0:-2, 1:-1]) # top
+        b = copy(self.D[2:  , 1:-1]) # bottom
 
         # compute neighbour average
         self.D[1:-1, 1:-1] = l//4 + r//4 + t//4 + b//4
@@ -1294,7 +1296,7 @@ if __name__ == "__main__":
             31, 6.332311209754091e-11,
             87, 6.048215759261286e-11,
             247, 5.992852197701082e-11,
-            801, 5.971289191392915e-11,        # set subnet geometry
+            801, 5.971289191392915e-11,
 
             2400, 5.967733448169437e-11,
             ],
@@ -1356,7 +1358,7 @@ if __name__ == "__main__":
         # INIT SOLVER
         N, L = NN[0]
         S = SolverTwoDimensions(n = SZ, l = L)
-        S.addPart("C", PlateSolid(0.0, 0.1, 0.2, 0.01))
+        S.addPart("C", PlateSolid(0.0, 0.0, 0.2, 0.01))
         S.addPart("S", DiskAperture(0.95))
         # main series
         for i in range(N):

@@ -18,5 +18,8 @@ from numpy import log, ceil, logspace, diff, array
 # print([10, 20]+[])
 # print([1, 2, 3, 4, 5][:-1])
 # print([1, 2][:-1])
+# print(array([[1, 2], [3, 4]])[:, 0])
 
-print(array([[1, 2], [3, 4]])[:, 0])
+print([0, 1, 2, 3, 4][1:4])
+print([0, 1, 2, 3, 4][-1])
+print([0, 1, 2, 3, 4][-2])
