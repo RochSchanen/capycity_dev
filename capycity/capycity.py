@@ -1,7 +1,7 @@
 
 # DEBUG DISPLAY
-VERBOSE     = True
-VERBOSE_MAP = False
+VERBOSE         = True
+VERBOSE_MAPDATA = False
 
 # TIME RESSOURCE
 from time import time
@@ -196,57 +196,73 @@ class SolverTwoDimensions():
 
     def addSubnet(self, L):                                       # !
 
-        if VERBOSE: print("subnet")
+        if VERBOSE: print("subnet: \n from:")
 
-        # find all bottom layer subnets
-        S = {}
+        # build the bottom subnet layer
+        S = []
         for k in self.M.keys():
-            S[k] = self.S
-            s = self.M[k].S
-            while S[k]:
+            # initialise loop with main map
+            t, s = self.M[k], self.M[k].S
+            # recurrently loop until no more subnet
+            while s: t, s = s, s.S
+            # register last subnet
+            S.append(t)
+            #debug
+            if VERBOSE: print(k, t.nn, t.ll)
 
-                S[k] = s[k].S
+        # scan through top and bottom
+        # layer and create new layer
+        for s, k in zip(S, self.M.keys()):
+            # get bottom geometry
+            nx, ny = s.nn
+            lx, ly = s.ll
+            # center position
+            ox = (nx + 1.0) / 2.0
+            oy = (ny + 1.0) / 2.0
+            # scale
+            ax = lx / nx
+            ay = ly / ny
+            # new binding box
+            l = int(ceil(-L/ax/2+ox))
+            b = int(ceil(-L/ay/2+oy))
+            r, t = nx+1-l, ny+1-b
+            """ forcing the right and top
+            values to be centre-symmetric
+            in relation to the left and
+            bottom values. """
+            if VERBOSE: print(l, r, t, b)
+            # compute new subnet geometry
+            nx, ny = r-l+1, t+1-b
+            lx, ly = ax*nx, ax*ny
+            if VERBOSE: print(nx, ny)
+            if VERBOSE: print(lx, ly)
+            # increase resolution
+            nx, ny = 2*nx, 2*ny
+            """ the resolution in increased
+            by increasing the grid sizes and
+            keeping the same lengths. """
+            # create the new subnet map
+            s.S = _map([nx, ny], [lx, ly])
+            # reference mask instance from main map
+            s.S.addNewAnchor(self.M[k].M)
+            # save current data for the quadruplication
+            D = copy(s.D[b:t+1, l:r+1])
+            # quadruplicate the data set
+            s.S.D[1:-1:2, 1:-1:2] = D
+            s.S.D[2:-1:2, 1:-1:2] = D
+            s.S.D[1:-1:2, 2:-1:2] = D
+            s.S.D[2:-1:2, 2:-1:2] = D
 
-
-        # # get current geometry
-        # nx, ny = S.nn
-        # lx, ly = S.ll
-        # ox = (nx + 1.0) / 2.0
-        # oy = (ny + 1.0) / 2.0
-        # ax = lx / nx
-        # ay = ly / ny
-
-        # # new binding box
-        # l, b = int(ceil(-L/ax/2+ox)), int(ceil(-L/ay/2+oy))
-        # r, t = nx+1-l, ny+1-b
-        # """ force the right and top values to be centre-symmetric
-        # in relatition to the left and bottom values. """
-        # if VERBOSE: print(l, r, t, b)
-
-        # # set subnet geometry
-        # nx, ny = r-l+1, t+1-b
-        # if VERBOSE: print(nx, ny)
-        # lx, ly = ax*nx, ax*ny
-        # if VERBOSE: print(lx, ly)
-        # # double the resolution by increasing the
-        # # grid sizes and keeping the same lengths
-        # nx, ny = 2*nx, 2*ny
-        
-        # # create subnet maps and anchor masks
-        # for k in self.M.keys():
-        #     self.M[k].S = _map([nx, ny], [lx, ly])
-        #     # duplicate anchor mask instance (by ref?)
-        #     self.M[k].S.addNewAnchor(self.M[k].M)
-        #     """ anchors are created automatically
-        #     with the addNewAnchor() method """
-
-        # # build subnet clear masks
-        # for k in self.M.keys():
-        #     # loop though all the parts but k
-        #     for l in self.M.keys():
-        #         if k == l: continue
-        #         # merge masks
-        #         self.M[k].S.C &= invert(self.M[l].S.A)
+        # build subnets clear mask
+        for s in S:
+            # loop though all the parts but s
+            for t in S:
+                if s == t: continue
+                # merge masks
+                s.S.C &= invert(t.S.A)
+        """ the clear masks can only be
+        build after all the anchor masks
+        have been created. """
 
         # done
         return
@@ -462,14 +478,12 @@ class _map():
         # create new anchor map (unit potential from this part)
         self.A = full([nx+2, ny+2], ZV, _DT)
         # debug
-        if VERBOSE_MAP: print(f"map:")
-        if VERBOSE_MAP: print(f"{self.D}")
+        if VERBOSE_MAPDATA: print(f"map:")
+        if VERBOSE_MAPDATA: print(f"{self.D}")
         # sub-map
         self.S = None
         # mask generator method(s)
         self.M = None
-        # gradient map
-        self.dD = None
         # done
         return
 
@@ -492,8 +506,8 @@ class _map():
         """ when there is more than one mask constructor
         to build the mask, all the masks generated must be
         merged together here."""
-        if VERBOSE_MAP: print(f"anchor map:")
-        if VERBOSE_MAP: print(f"{self.A}:")
+        if VERBOSE_MAPDATA: print(f"anchor map:")
+        if VERBOSE_MAPDATA: print(f"{self.A}:")
         # done
         return
 
@@ -1108,23 +1122,29 @@ def mplot(solver, figname, mapname):
     # add decors
     for k in solver.M.keys():
         ax.add_artist(solver.M[k].M.decor())
-    showResolution(solver, ax)
+    if VERBOSE: showResolution(solver, ax)
     # done
     return fg, ax, bx
 
-def splot(m):
-    # get the mesh coordinates
-    X, Y = mesh(m.nn, m.ll)
-    # get normalised data without the edges
-    D = m.D[1:-1, 1:-1] / MV
-    # create filled contour map
-    QCS = ax.pcolormesh(
-        X, Y, D,
-        vmin = 0.0, vmax = 1.0,
-        shading = 'auto', 
-        rasterized = True)
-    # set colour map
-    QCS.set_cmap(cm.inferno)
+def splot(ax, m):
+    while m.S:
+        # get the mesh coordinates
+        X, Y = mesh(m.S.nn, m.S.ll)
+        # get normalised data without the edges
+        D = m.S.D[1:-1, 1:-1] / MV
+        # create filled contour map
+        QCS = ax.pcolormesh(
+            X+0.0, Y+0.0, D,
+            vmin = 0.0, vmax = 1.0,
+            shading = 'auto', 
+            rasterized = True)
+        # set colour map
+        QCS.set_cmap(cm.inferno)
+        # add decor
+        if VERBOSE: ax.add_artist(m.S.decor())
+        # get next subnet
+        m = m.S
+    # done
     return
 
 def headerText(text, fg):
@@ -1318,27 +1338,40 @@ if __name__ == "__main__":
     if SELECT == "MULTI-GRID":
 
         # INIT SOLVER
-        S = SolverTwoDimensions(n = 32, l = 1.5)
+        S = SolverTwoDimensions(n = 32, l = 2.0)
 
         # ADD PARTS
-        S.addPart("C", DiskSolid(0.15))
-        S.addPart("S", DiskAperture(0.65))
-        
-        S.addSubnet(0.50)
-        
-        for i in range(500):
+        S.addPart("C", PlateSolid(0.0, 0.0, 0.2, 0.1))
+        S.addPart("S", DiskAperture(0.95))
+        for i in range(100):
+            S.M["C"].jacobiStep()
+            S.M["S"].jacobiStep()
+
+        S.addSubnet(1.2)
+        for i in range(100):
+            S.M["C"].jacobiStep()
+            S.M["S"].jacobiStep()
+
+        S.addSubnet(0.9)
+        for i in range(100):
+            S.M["C"].jacobiStep()
+            S.M["S"].jacobiStep()
+
+        S.addSubnet(0.5)
+        for i in range(100):
+            S.M["C"].jacobiStep()
+            S.M["S"].jacobiStep()
+
+        S.addSubnet(0.25)
+        for i in range(100):
             S.M["C"].jacobiStep()
             S.M["S"].jacobiStep()
 
         fg, ax, bx = mplot(S, "P1", "C")
-        if S.M["C"].S:
-            ax.add_artist(S.M["C"].S.decor())
-            splot(S.M["C"].S)
+        if S.M["C"].S: splot(ax, S.M["C"])
 
         fg, ax, bx = mplot(S, "P2", "S")
-        if S.M["S"].S:
-            ax.add_artist(S.M["S"].S.decor())
-            splot(S.M["S"].S)
+        if S.M["S"].S: splot(ax, S.M["S"])
 
         # BUILD PDF
         D = Document()
