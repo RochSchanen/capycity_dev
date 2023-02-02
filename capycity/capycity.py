@@ -535,6 +535,9 @@ class _map():
         b += self.D[-2, 2:-1:2]//4
         b += self.D[-3, 1:-1:2]//4
         b += self.D[-3, 2:-1:2]//4
+
+        t = full(len(self.D[1:-1:2, +1]), MV, _DT)
+
         # done
         return l, r, t, b
 
@@ -1048,12 +1051,12 @@ def selectmapfigure(name):
     # done
     return fg, ax, bx
 
-def showResolution(solver, ax):
+def showResolution(ax, m):
     # get geometry
-    nx, ny = solver.nn
-    lx, ly = solver.ll
+    X, Y = mesh(m.nn, m.ll)
+    nx, ny = m.nn
+    lx, ly = m.ll
     dx, dy = lx / nx, ly / ny
-    X, Y = mesh(solver.nn, solver.ll)
     # loop through four corners
     for i, j in [(1, 1), (1, -2), (-2, 1), (-2, -2)]:
         # compute coordinates of a rectangle of size dx, dy
@@ -1122,11 +1125,13 @@ def mplot(solver, figname, mapname):
     # add decors
     for k in solver.M.keys():
         ax.add_artist(solver.M[k].M.decor())
-    if VERBOSE: showResolution(solver, ax)
+    if VERBOSE: showResolution(ax, solver.M[k])
     # done
     return fg, ax, bx
 
 def splot(ax, m):
+    VX, VY = 0.5, 0.5
+    # VX, VY = 0.0, 0.0
     while m.S:
         # get the mesh coordinates
         X, Y = mesh(m.S.nn, m.S.ll)
@@ -1134,7 +1139,7 @@ def splot(ax, m):
         D = m.S.D[1:-1, 1:-1] / MV
         # create filled contour map
         QCS = ax.pcolormesh(
-            X+0.0, Y+0.0, D,
+            X+VX, Y+VY, D,
             vmin = 0.0, vmax = 1.0,
             shading = 'auto', 
             rasterized = True)
@@ -1142,6 +1147,7 @@ def splot(ax, m):
         QCS.set_cmap(cm.inferno)
         # add decor
         if VERBOSE: ax.add_artist(m.S.decor())
+        if VERBOSE: showResolution(ax, m.S)
         # get next subnet
         m = m.S
     # done
@@ -1337,36 +1343,34 @@ if __name__ == "__main__":
 
     if SELECT == "MULTI-GRID":
 
+        SZ = 32
+
+        NN = [
+            (500, 2.0),
+            (100, 1.0),
+            # (100, 2.0),
+            # (100, 2.0),
+            # (100, 2.0),
+            ]
+
         # INIT SOLVER
-        S = SolverTwoDimensions(n = 32, l = 2.0)
-
-        # ADD PARTS
-        S.addPart("C", PlateSolid(0.0, 0.0, 0.2, 0.1))
+        N, L = NN[0]
+        S = SolverTwoDimensions(n = SZ, l = L)
+        S.addPart("C", PlateSolid(0.0, 0.1, 0.2, 0.01))
         S.addPart("S", DiskAperture(0.95))
-        for i in range(100):
+        # main series
+        for i in range(N):
             S.M["C"].jacobiStep()
             S.M["S"].jacobiStep()
+        # subnet series
+        for N, L in NN[1:]:
+            # ADD SUBNET
+            S.addSubnet(L)
+            for i in range(N):
+                S.M["C"].jacobiStep()
+                S.M["S"].jacobiStep()
 
-        S.addSubnet(1.2)
-        for i in range(100):
-            S.M["C"].jacobiStep()
-            S.M["S"].jacobiStep()
-
-        S.addSubnet(0.9)
-        for i in range(100):
-            S.M["C"].jacobiStep()
-            S.M["S"].jacobiStep()
-
-        S.addSubnet(0.5)
-        for i in range(100):
-            S.M["C"].jacobiStep()
-            S.M["S"].jacobiStep()
-
-        S.addSubnet(0.25)
-        for i in range(100):
-            S.M["C"].jacobiStep()
-            S.M["S"].jacobiStep()
-
+        # DISPLAY
         fg, ax, bx = mplot(S, "P1", "C")
         if S.M["C"].S: splot(ax, S.M["C"])
 
