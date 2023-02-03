@@ -1,7 +1,8 @@
 
 # DEBUG DISPLAY
-VERBOSE         = True
-VERBOSE_MAPDATA = False
+VERBOSE          = False
+VERBOSE_MAPDATA  = False
+VERBOSE_MAPEDGES = True
 
 # TIME RESSOURCE
 from time import time
@@ -40,7 +41,6 @@ version = 0.02
         - merge anchor masks
 
         - check on convergence factor technique and Gauss-Seidel
-
 """
 if VERBOSE: print(f"version {version}")
 
@@ -255,6 +255,8 @@ class SolverTwoDimensions():
             s.S.D[1:-1:2, 2:-1:2] = D
             s.S.D[2:-1:2, 2:-1:2] = D
 
+        print(f"size=({nx}, {ny}), res={lx/nx*1E3:.3f}mm")
+
         # build subnets clear mask
         for s in S:
             # loop though all the parts but s
@@ -401,62 +403,52 @@ class SolverTwoDimensions():
         computing time. This scheme is not used with
         sub-maps, only with the main map. """
 
-        # debug
-        if VERBOSE: print("<-", end = "")
         # get current values
         nx, ny = self.nn        
+        lx, ly = self.ll
+
         # update to new values
         nx, ny = nx<<1, ny<<1
+
         # register the new values
         self.nn = nx, ny        
-        # debug
-        if VERBOSE: print("map.D-", end = "")
-        # QUADRUPLICATE ALL DATA MAPS AND UPDATE LOCALS
+        print(f"size={self.nn}, res={lx/nx*1E3:.3f}mm")
+
+        # update all parts with new resolution
         for k in self.M.keys():
+
             # update grid size
             self.M[k].nn = nx, ny
+
             # save current data for the upgrade
             D = copy(self.M[k].D[1:-1, 1:-1])
             """ edges are ignored. """
+
             # reserve memory for the new data set
-            self.M[k].D = full([nx+2, ny+2], ZV, _DT)
+            self.M[k].D = full([ny+2, nx+2], ZV, _DT)
             """ the new data set is initialised to
             zeros. This is clearing up the edges.
-            The rest of the array is defined during
-            the 'quadruplication' """
-            # debug
-            if VERBOSE: print("quad-", end = "")
-            # quadruplicate the data set
+            The rest of the array is defined next. """
+
+            # quadruplication
             self.M[k].D[1:-1:2, 1:-1:2] = D
             self.M[k].D[2:-1:2, 1:-1:2] = D
             self.M[k].D[1:-1:2, 2:-1:2] = D
             self.M[k].D[2:-1:2, 2:-1:2] = D
-        # debug
-        if VERBOSE: print("map.A-", end = "")
-        # RE-BUILD ALL ANCHOR MASKS
+
+        # re-build all anchor masks
         for k in self.M.keys():
-            # re-build ANCHOR mask
             self.M[k].buildAnchorMask()
-        # debug
-        if VERBOSE: print("map.C-", end = "")
-        # RE-BUILD ALL CLEAR MASKS
+
+        # re-build all clear masks
         for k in self.M.keys():
             # reserve new memory for the new CLEAR mask
-            self.M[k].C = full([nx+2, ny+2], MV, _DT)
+            self.M[k].C = full([ny+2, nx+2], MV, _DT)
             # loop though all the other parts
             for l in self.M.keys():
                 if k == l: continue
-                # merge masks
+                # merge mask from other parts
                 self.M[k].C &= invert(self.M[l].A)
-        # debug
-        if VERBOSE: print("mesh-", end = "")
-
-        # re-compute mesh
-        self._computemesh()
-
-        # debug
-        if VERBOSE: print(">")
-
         # done
         return
 
@@ -537,9 +529,6 @@ class _map():
         b += self.D[+1, 2:-1:2]//4
         b += self.D[+2, 1:-1:2]//4
         b += self.D[+2, 2:-1:2]//4
-
-        t = full(len(self.D[1:-1:2, +1]), MV, _DT)
-
         # done
         return l, r, t, b
 
@@ -692,10 +681,10 @@ class _map():
         # make decor
         c = Rectangle(
                 (l, b), r-l, t-b,
-                edgecolor = (0.8, 0.4, 0.4),
+                edgecolor = (0.4, 0.3, 0.3),
                 linestyle = "-.",# line style
                 fill      = False,
-                linewidth = 1,
+                linewidth = 0.5,
             )
         return c
 
@@ -1127,13 +1116,12 @@ def mplot(solver, figname, mapname):
     # add decors
     for k in solver.M.keys():
         ax.add_artist(solver.M[k].M.decor())
-    if VERBOSE: showResolution(ax, solver.M[k])
+    if VERBOSE_MAPEDGES: showResolution(ax, solver.M[k])
     # done
     return fg, ax, bx
 
 def splot(ax, m):
-    VX, VY = 0.5, 0.5
-    # VX, VY = 0.0, 0.0
+    VX, VY = 0.0, 0.0
     while m.S:
         # get the mesh coordinates
         X, Y = mesh(m.S.nn, m.S.ll)
@@ -1148,8 +1136,8 @@ def splot(ax, m):
         # set colour map
         QCS.set_cmap(cm.inferno)
         # add decor
-        if VERBOSE: ax.add_artist(m.S.decor())
-        if VERBOSE: showResolution(ax, m.S)
+        if VERBOSE_MAPEDGES: ax.add_artist(m.S.decor())
+        if VERBOSE_MAPEDGES: showResolution(ax, m.S)
         # get next subnet
         m = m.S
     # done
@@ -1345,44 +1333,68 @@ if __name__ == "__main__":
 
     if SELECT == "MULTI-GRID":
 
-        SZ = 32
+        # electrodes position and geometry
+        Width, Height, Gap, Offset = 0.20, 0.01, 0.02, 0.00
 
-        NN = [
-            (500, 2.0),
-            (100, 1.0),
-            # (100, 2.0),
-            # (100, 2.0),
-            # (100, 2.0),
+        # main grid 
+        Size, Length = 8, 2.048
+
+        # shield geometry
+        Radius = (Length*0.95)/2.0
+
+        # initial map series
+        MainSeries = [100]*5
+
+        # subnet map series
+        SubnetSeries = [
+            (1.5, 100),
+            (1.0, 100),
+            (0.7, 100),
+            (0.5, 100),
             ]
 
         # INIT SOLVER
-        N, L = NN[0]
-        S = SolverTwoDimensions(n = SZ, l = L)
-        S.addPart("C", PlateSolid(0.0, 0.0, 0.2, 0.01))
-        S.addPart("S", DiskAperture(0.95))
+        S = SolverTwoDimensions(n = Size, l = Length)
+        S.addPart("C1", PlateSolid(0.0, +(Height+Gap)/2, Width, Height))
+        S.addPart("C2", PlateSolid(0.0, -(Height+Gap)/2, Width, Height))
+        S.addPart("SH", DiskAperture(Radius))
+        
+        def Step():
+            S.M["C1"].jacobiStep()
+            S.M["C2"].jacobiStep()
+            # S.M["SH"].jacobiStep()
+
         # main series
-        for i in range(N):
-            S.M["C"].jacobiStep()
-            S.M["S"].jacobiStep()
+        for N in MainSeries[:-1]:
+            for n in range(N): Step()
+            S.incrementResolution()
+        # last of the main series
+        for n in range(MainSeries[-1]): Step()
+
         # subnet series
-        for N, L in NN[1:]:
+        for L, N in SubnetSeries:
             # ADD SUBNET
             S.addSubnet(L)
-            for i in range(N):
-                S.M["C"].jacobiStep()
-                S.M["S"].jacobiStep()
+            for n in range(N): Step()
 
         # DISPLAY
-        fg, ax, bx = mplot(S, "P1", "C")
-        if S.M["C"].S: splot(ax, S.M["C"])
+        fg, ax, bx = mplot(S, "P1", "C1")
+        if S.M["C1"].S: splot(ax, S.M["C1"])
 
-        fg, ax, bx = mplot(S, "P2", "S")
-        if S.M["S"].S: splot(ax, S.M["S"])
+        # fg, ax, bx = mplot(S, "P2", "C2")
+        # if S.M["C2"].S: splot(ax, S.M["C2"])
+
+        # fg, ax, bx = mplot(S, "P3", "SH")
+        # if S.M["SH"].S: splot(ax, S.M["SH"])
+
+        # PP = ["P1", "P2", "P3"]
+        # PP = ["P1", "P2"]
+        PP = ["P1"]
 
         # BUILD PDF
         D = Document()
         D.opendocument("../local/plot.pdf")
-        for p in ["P1", "P2"]:
+        for p in PP:
             D.exportfigure(p)
         D.closedocument()
 
