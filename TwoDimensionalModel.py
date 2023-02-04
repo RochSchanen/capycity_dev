@@ -28,7 +28,7 @@ e = 0.000   # excentricity
 r = 50.000  # shield radius
 
 
-ll = 100.0  # grid size
+ll = 100.0  # grid length
 dd = 0.200  # resolution
 
 N0 = 
