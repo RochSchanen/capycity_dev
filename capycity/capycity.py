@@ -296,83 +296,83 @@ class SolverTwoDimensions():
         # done
         return
 
-    def jacobiSteps(self, n, name1, name2, SavePattern = None):   # +
-        """ Perform a series of "n" Jacobi steps on the
-        maps associated with part "name1" and part "name2".
-        It returns the capacitance value at the end of the
-        series or it can record a series of capacitance values
-        following the optional "SavePattern" argument. This
-        argument is a list of indices for which the capacitance
-        has to be calculated. The same number of steps is
-        applied to all maps. This is justified if the convergence
-        rate depends only/mostly on the size of the grid and
-        not so much on the geometry (masks definitions) of the
-        parts. This assumption also should allow to devise
-        a fixed series of "resolution increments"/"Jacobi steps"
-        that should be valid for all geometries and should only
-        depends on the grid size. """
-        K, C = [], []
-        for i in range(n):
-            # n Jacobi step iterations over C1 and C2
-            self.M[name1].jacobiStep()
-            self.M[name2].jacobiStep()
-            # save if step match pattern element
-            if SavePattern:
-                if (self.k+i) in SavePattern:
-                    K.append(self.k+i)
-                    C.append(self.computeCapacitance(name1, name2))
-        # increment step counter
-        self.k += n
-        # return a single value
-        if SavePattern is None:
-            return self.computeCapacitance(name1, name2)
-        # return saved data
-        return K, C
+    # def jacobiSteps(self, n, name1, name2, SavePattern = None):   # +
+    #     """ Perform a series of "n" Jacobi steps on the
+    #     maps associated with part "name1" and part "name2".
+    #     It returns the capacitance value at the end of the
+    #     series or it can record a series of capacitance values
+    #     following the optional "SavePattern" argument. This
+    #     argument is a list of indices for which the capacitance
+    #     has to be calculated. The same number of steps is
+    #     applied to all maps. This is justified if the convergence
+    #     rate depends only/mostly on the size of the grid and
+    #     not so much on the geometry (masks definitions) of the
+    #     parts. This assumption also should allow to devise
+    #     a fixed series of "resolution increments"/"Jacobi steps"
+    #     that should be valid for all geometries and should only
+    #     depends on the grid size. """
+    #     K, C = [], []
+    #     for i in range(n):
+    #         # n Jacobi step iterations over C1 and C2
+    #         self.M[name1].jacobiStep()
+    #         self.M[name2].jacobiStep()
+    #         # save if step match pattern element
+    #         if SavePattern:
+    #             if (self.k+i) in SavePattern:
+    #                 K.append(self.k+i)
+    #                 C.append(self.computeCapacitance(name1, name2))
+    #     # increment step counter
+    #     self.k += n
+    #     # return a single value
+    #     if SavePattern is None:
+    #         return self.computeCapacitance(name1, name2)
+    #     # return saved data
+    #     return K, C
 
-    def jacobiStepSeries(self, S, C1, C2, n = 500):               # !
-        """ S is a list of step series numbers. After each step
-        series, the resolution of the grid is incremented by a factor
-        two. This is why the resolution of the grid is always a power
-        of two. C1 and C2 are the names of the two conductors for
-        which we compute the mutual capacitance. The other conductors
-        affect the computation only by their presence (geometry) and
-        the value of their potential is kept at zero (See theoretical
-        considerations from the report). At the end of each series,
-        the total number of steps and the value of the capacitance is
-        computed and recorded in list K and R. This allows to monitor
-        the convergence the series. """
-        if VERBOSE:
-            nx, ny = self.nn
-            print(f"resolution: {nx}x{ny}")
-        # compute saving pattern (logarithmic spacing)
-        decade = ceil(log(sum(S)) / log(10))
-        P = list(logspace(0, decade, n, dtype = 'int'))
-        # make sure the last step is recorded
-        P.append(sum(S))
-        # declare lists
-        K = []  # steps
-        C = []  # capacitances
-        # loop through series
-        for n in S[:-1]:
-            # compute steps series
-            k, c = self.jacobiSteps(n, C1, C2, P)
-            # append data points
-            K += k; C += c
-            # increment resolution
-            self.incrementResolution()
-            if VERBOSE:
-                nx, ny = self.nn
-                print(f"resolution: {nx}x{ny}")
-            # add first point after resolution increment
-            K += [self.k]
-            C += [self.computeCapacitance(C1, C2)]
-            self.k += 1
-        # compute last steps series
-        k, c = self.jacobiSteps(S[-1], C1, C2, P)
-        # append last data points
-        K += k; C += c
-        # done 
-        return K, C
+    # def jacobiStepSeries(self, S, C1, C2, n = 500):               # !
+    #     """ S is a list of step series numbers. After each step
+    #     series, the resolution of the grid is incremented by a factor
+    #     two. This is why the resolution of the grid is always a power
+    #     of two. C1 and C2 are the names of the two conductors for
+    #     which we compute the mutual capacitance. The other conductors
+    #     affect the computation only by their presence (geometry) and
+    #     the value of their potential is kept at zero (See theoretical
+    #     considerations from the report). At the end of each series,
+    #     the total number of steps and the value of the capacitance is
+    #     computed and recorded in list K and R. This allows to monitor
+    #     the convergence the series. """
+    #     if VERBOSE:
+    #         nx, ny = self.nn
+    #         print(f"resolution: {nx}x{ny}")
+    #     # compute saving pattern (logarithmic spacing)
+    #     decade = ceil(log(sum(S)) / log(10))
+    #     P = list(logspace(0, decade, n, dtype = 'int'))
+    #     # make sure the last step is recorded
+    #     P.append(sum(S))
+    #     # declare lists
+    #     K = []  # steps
+    #     C = []  # capacitances
+    #     # loop through series
+    #     for n in S[:-1]:
+    #         # compute steps series
+    #         k, c = self.jacobiSteps(n, C1, C2, P)
+    #         # append data points
+    #         K += k; C += c
+    #         # increment resolution
+    #         self.incrementResolution()
+    #         if VERBOSE:
+    #             nx, ny = self.nn
+    #             print(f"resolution: {nx}x{ny}")
+    #         # add first point after resolution increment
+    #         K += [self.k]
+    #         C += [self.computeCapacitance(C1, C2)]
+    #         self.k += 1
+    #     # compute last steps series
+    #     k, c = self.jacobiSteps(S[-1], C1, C2, P)
+    #     # append last data points
+    #     K += k; C += c
+    #     # done 
+    #     return K, C
 
     def computegradient(self, name):                              # !
         """ The electric field is directly computed
