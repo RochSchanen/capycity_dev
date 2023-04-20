@@ -1295,7 +1295,7 @@ if __name__ == "__main__":
         D.exportfigure(p)
     D.closedocument()
 
-# done
-time_done = time()
-print(f"load in {time_compute - time_start}s")
-print(f"compute in {time_done - time_compute}s")
+    # done
+    time_done = time()
+    print(f"load in {time_compute - time_start}s")
+    print(f"compute in {time_done - time_compute}s")
