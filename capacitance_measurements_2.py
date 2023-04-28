@@ -215,8 +215,6 @@ ax.set_ylabel("Capacitance [pF]")
 ax.vlines([list(array([-12, -6, 0, +6, +12])+6.40)], 0, 200, "k", "dashed")
 ax.grid("True")
 
-fg, ax = selectfigure("Gap dependence")
-
 def C(d):
     e0 = 8.854E-12
     N, r, R, eta_deg = 12, 7.5E-3, 20E-3, 6
@@ -224,13 +222,13 @@ def C(d):
     C = N*e0*L*l*eta/d
     return C
 
+fg, ax = selectfigure("Gap dependence 1")
+
 X, Y = D2[:, 0]*350/12, D2[:, 1]
-ax.plot(X, Y, "b.-.", linewidth = 0.50)
-# ax.plot(X, 1/(Y-4.0), "r.-")
+ax.plot(X, Y, "b.", linewidth = 0.50)
 
 X, Y = D3[:, 0]*350/12, D3[:, 1]
-# X, Y = D3[:, 0]*350/12-8, D3[:, 1]
-ax.plot(X, Y, "r.-.", linewidth = 0.50)
+ax.plot(X, Y, "r.", linewidth = 0.50)
 
 X = linspace(20, 500, 50)
 ax.plot(X, C(X*1E-6)*1E12, "k-", linewidth = 0.50)
@@ -239,10 +237,29 @@ ax.set_xlim(0, 600)
 ax.set_ylim(0, 100)
 ax.set_xlabel("gap [µm]")
 ax.set_ylabel("Capacitance [pF]")
-# ax.vlines([list(array([-12, -6, 0, +6, +12])+6.40)], 0, 200, "k", "dashed")
+ax.grid("True")
+
+fg, ax = selectfigure("Gap dependence 2")
+
+X, Y = D2[:, 0]*350/12, D2[:, 1]
+ax.plot(X, Y, "b.", linewidth = 0.50)
+# ax.plot(X, 1/(Y-4.0), "r.-")
+
+# X, Y = D3[:, 0]*350/12, D3[:, 1]
+X, Y = D3[:, 0]*350/12-8, D3[:, 1]
+ax.plot(X, Y, "r.", linewidth = 0.50)
+
+X = linspace(20, 500, 50)
+ax.plot(X, C(X*1E-6)*1E12, "k-", linewidth = 0.50)
+
+ax.set_xlim(0, 600)
+ax.set_ylim(0, 100)
+ax.set_xlabel("gap [µm]")
+ax.set_ylabel("Capacitance [pF]")
 ax.grid("True")
 
 doc = Document("./capacitance_measurements_Graphic_result.pdf")
 doc.exportfigure("Angle dependence")
-doc.exportfigure("Gap dependence")
+doc.exportfigure("Gap dependence 1")
+doc.exportfigure("Gap dependence 2")
 doc.closedocument()
