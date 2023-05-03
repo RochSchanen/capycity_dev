@@ -1,6 +1,60 @@
-from numpy import array
+# file: capacitance_measurements_2.py
+# created: 2023 01 07
+# author: Roch Schanen
 
-D1 = array([
+# libraries, function and classes
+
+from numpy import pi, array, linspace
+from matplotlib.pyplot import figure, fignum_exists
+from matplotlib.backends.backend_pdf import PdfPages
+
+def selectfigure(name):
+    if not fignum_exists(name):
+        # create figure
+        fg = figure(name)
+        # set A4 paper dimensions
+        fg.set_size_inches(8.2677, 11.6929)
+        # create square axis
+        w, h = array([1, 1 / 1.4143])*0.7
+        x, y = (1-w)/2, (1-h)/2
+        ax = fg.add_axes([x, y, w, h])
+    else:
+        # select figure
+        fg = figure(name)
+        # get axes
+        ax = fg.get_axes()[0]
+    # done
+    return fg, ax
+
+class Document():
+
+    def __init__(self, pathname = None):
+        if pathname is not None:
+            self._DOC = self.opendocument(pathname)
+        return
+
+    def opendocument(self, pathname):
+        self._DOC = PdfPages(pathname)
+        return self._DOC
+
+    def exportfigure(self, name):
+        args = selectfigure(name)
+        self._DOC.savefig(args[0])
+        return
+
+    def closedocument(self):
+        self._DOC.close()
+        return
+
+#####################################################################
+###                          DATA                                 ###
+#####################################################################
+
+# overlap data
+# COL#1: relative angle in degrees (no absolute zero)
+# COL#2: measured capacitance using the ET4502 LCR
+
+D1 = array([ 
 
     [-16.00,  79.56],
     [-15.75,  76.20],
@@ -149,6 +203,10 @@ D1 = array([
 
 ])
 
+# gap data (one of the two electrodes)
+# COL#1: 1/12 turn units (12 means one turn, pitch is 350µm/turn)
+# COL#2: measured capacitance using the ET4502 LCR
+
 D2 = array([
 
     # [ 0.0,   0.00 ],
@@ -174,6 +232,10 @@ D2 = array([
 
     [18.0,   9.203],
 ])
+
+# gap data (the other of the two electrodes)
+# COL#1: 1/12 turn units (12 means one turn, pitch is 350µm/turn)
+# COL#2: measured capacitance using the ET4502 LCR
 
 D3 = array([
 
@@ -201,20 +263,26 @@ D3 = array([
     [18.0,   9.092],
 ])
 
-from capycity.capycity import selectfigure
-from capycity.capycity import Document
-from numpy import pi
-from numpy import linspace
+#####################################################################
+###                          FIGURES                              ###
+#####################################################################
 
+# figure overlap dependence
 fg, ax = selectfigure("Angle dependence")
+
 ax.plot(D1[:, 0], D1[:, 1], "r.-")
 ax.plot(D1[:, 0]+30, D1[:, 1], "b.-")
+
+# add vertical lines
+ax.vlines([list(array([-12, -6, 0, +6, +12])+6.40)], 0, 200, "k", "dashed")
+
+# set decorum
 ax.set_ylim(0, 200)
 ax.set_xlabel("angle [degrees]")
 ax.set_ylabel("Capacitance [pF]")
-ax.vlines([list(array([-12, -6, 0, +6, +12])+6.40)], 0, 200, "k", "dashed")
 ax.grid("True")
 
+# theoretical capacitance value as a function of the gap:
 def C(d):
     e0 = 8.854E-12
     N, r, R, eta_deg = 12, 7.5E-3, 20E-3, 6
@@ -222,44 +290,28 @@ def C(d):
     C = N*e0*L*l*eta/d
     return C
 
-fg, ax = selectfigure("Gap dependence 1")
+# figure gap dependence
+fg, ax = selectfigure("Gap dependence")
 
 X, Y = D2[:, 0]*350/12, D2[:, 1]
-ax.plot(X, Y, "b.", linewidth = 0.50)
+ax.plot(X, Y, "b.-.", linewidth = 0.50)
 
 X, Y = D3[:, 0]*350/12, D3[:, 1]
-ax.plot(X, Y, "r.", linewidth = 0.50)
+ax.plot(X, Y, "r.-.", linewidth = 0.50)
 
+# add theoretical values
 X = linspace(20, 500, 50)
 ax.plot(X, C(X*1E-6)*1E12, "k-", linewidth = 0.50)
 
+# set decorum
 ax.set_xlim(0, 600)
 ax.set_ylim(0, 100)
 ax.set_xlabel("gap [µm]")
 ax.set_ylabel("Capacitance [pF]")
 ax.grid("True")
 
-fg, ax = selectfigure("Gap dependence 2")
-
-X, Y = D2[:, 0]*350/12, D2[:, 1]
-ax.plot(X, Y, "b.", linewidth = 0.50)
-# ax.plot(X, 1/(Y-4.0), "r.-")
-
-# X, Y = D3[:, 0]*350/12, D3[:, 1]
-X, Y = D3[:, 0]*350/12-8, D3[:, 1]
-ax.plot(X, Y, "r.", linewidth = 0.50)
-
-X = linspace(20, 500, 50)
-ax.plot(X, C(X*1E-6)*1E12, "k-", linewidth = 0.50)
-
-ax.set_xlim(0, 600)
-ax.set_ylim(0, 100)
-ax.set_xlabel("gap [µm]")
-ax.set_ylabel("Capacitance [pF]")
-ax.grid("True")
-
+# export document
 doc = Document("./capacitance_measurements_Graphic_result.pdf")
 doc.exportfigure("Angle dependence")
-doc.exportfigure("Gap dependence 1")
-doc.exportfigure("Gap dependence 2")
+doc.exportfigure("Gap dependence")
 doc.closedocument()
