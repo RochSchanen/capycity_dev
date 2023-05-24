@@ -152,16 +152,72 @@ D = array([
 from capycity.capycity import selectfigure
 from capycity.capycity import Document
 
+from numpy import linspace
+
+def overlap(a):
+	# a: angle in degrees (origin at maximum)
+	# package imports:
+	from numpy import mod, fabs
+	# mod(x,1.0) returns the fractional part of x
+	# fabs(x) returns the absolute value of x
+	# define boundaries, M: maximum overlap, T: period
+	M, T = 12.0, 30.0
+	# compute overlap from angle
+	O = M-T*abs(mod(a/T+0.5, 1.0)-0.5)
+	# nullify negative values
+	O[O<0] = 0
+	# done
+	return O 
+
+def capacitance(angle, gap):
+	# angle: angle in degrees
+	# gap: gap in metres
+	# package imports:
+	from scipy.constants import epsilon_0 as E0
+	from numpy import pi, square, fabs
+	# overlap "eta" in radiants
+	eta = overlap(angle)*pi/180.0
+	# define star shape capacitance parameters
+	R1, R2 = 40E-3/2, 15E-3/2
+	N, L, l = 12, R1-R2, (R1+R2)/2.0
+	# compute star shape capacitance
+	C0 = N*E0*L*l/gap*eta
+	# define ring capacitance parameters
+	R3 = 13E-3/2
+	# compute ring capacitance
+	C1 = E0*(pi*square(R2)-pi*square(R3))/gap
+	# done
+	return (C0+C1)*1E12 # [pF]
+
+A = D[:, 0] # angle in degrees
+C = D[:, 1] # measured capacitance
+
+# 40µm plastic sheet parameters
+# measured dielectric constant relative to vacuum
+# measured thickness
+e, g = 1.8, 40E-6
+
 fg, ax = selectfigure("FH")
-ax.plot(D[:, 0], D[:, 1], "r.-")
-ax.plot(D[:, 0]+30, D[:, 1], "b.-")
-ax.set_ylim(0, 200)
+# plot C versus A
+ax.plot(A-6.5, C/e, "k.-")
+# same plot shifed by one period
+ax.plot(A-6.5+30.5, C/e, "k.-")
+# analytical plot
+ax.plot(A, capacitance(A, g), "r-")
+
+# ax.set_ylim(0, 100)
+
 ax.set_xlabel("angle [degrees]")
 ax.set_ylabel("Capacitance [pF]")
-ax.vlines([list(array([-12, -6, 0, +6, +12])+6.40)], 0, 200, "k", "dashed")
+ax.vlines(
+	[list(array([-12, -6, 0, +6, +12]))],
+	-10, 110, "k", "dashed", linewidth = 0.75)
+ax.hlines(
+	[list(array([0]))],
+	-30, 50, "k", "dashed", linewidth = 0.75)
 ax.grid("True")
 
-doc = Document("./local/capacitance_measurements.pdf")
+doc = Document("../result.pdf")
 doc.exportfigure("FH")
 doc.closedocument()
 
