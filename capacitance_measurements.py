@@ -275,6 +275,12 @@ ax.plot(A-6.5 + 30.5, C/e, "k.-")
 # analytical plot
 ax.plot(A, capacitance(A, g), "r-")
 ax.plot(A + 30.5, capacitance(A, g), "r-")
+ax.plot(A + 30.5, capacitance(A,  50E-6), "-", color = "gray")
+ax.plot(A + 30.5, capacitance(A, 100E-6), "-", color = "gray")
+ax.plot(A + 30.5, capacitance(A, 150E-6), "-", color = "gray")
+ax.plot(A + 30.5, capacitance(A, 200E-6), "-", color = "gray")
+ax.plot(A + 30.5, capacitance(A, 250E-6), "-", color = "gray")
+ax.plot(A + 30.5, capacitance(A, 300E-6), "-", color = "gray")
 
 # add labels
 ax.set_xlabel("angle [degrees]")
@@ -302,4 +308,3 @@ ax.grid("True", axis = "y", which = "both")
 doc = Document("../result.pdf") # file path + name
 doc.exportfigure("capa-vs-angle") # figure name
 doc.closedocument()
-
