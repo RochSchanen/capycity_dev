@@ -274,13 +274,33 @@ deg	deg	pF	pF
 ### USEFUL TOOLS ###
 ####################
 
-def selectfigure(name):
+def page_size(name = "A4", units = "inch"):
+    # compute A-class in millimeters (A0 to A10)
+    A = {"A0" : (841, 1189)}
+    for i in range(10):
+        W, H = A[f"A{i}"]
+        A[f"A{i+1}"] = (H/2, W)
+    # find dimensions
+    W, H = A[name]
+    # adjust units to inches
+    if units.upper() in ["INCHES", "INCH", "IN"]:
+        return (W/24.5, H/24.5)
+    # leave units in millimeters
+    if units.upper() in ["MILLIMETERS", "MILLIMETER", "MM"]:
+        return (W/1.0, H/1.0)
+    # adjust units to centimeters
+    if units.upper() in ["CENTIMETERS", "CENTIMETER", "CM"]:
+        return (W/10.0, H/10.0)
+    # undefined units
+    return None, None
+
+def selectfigure(name, format = "A4"):
     from matplotlib.pyplot import figure, fignum_exists
     if not fignum_exists(name):
         # create figure
         fg = figure(name)
         # set A4 paper dimensions
-        fg.set_size_inches(8.2677, 11.6929)
+        fg.set_size_inches(*page_size(format, "inches"))
         # create square axis
         w, h = array([1, 1 / 1.4143])*0.7
         x, y = (1-w)/2, (1-h)/2
@@ -421,7 +441,7 @@ e3, g3 = 1.87,  210E-6
 ### PLOT RESULTS ###
 ####################
 
-fg, ax = selectfigure("capa-vs-angle")
+fg, ax = selectfigure("capa-vs-angle", format = "A5")
 
 ax.plot(A1-6.5, C1/e1, "k.")
 ax.plot(A1-6.5, capacitance(A1-6.5, g1),
