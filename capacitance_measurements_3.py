@@ -367,11 +367,11 @@ def capacitance(angle, gap):
     # done
     return (C0+C1)*1E12 # [pF]
 
-########################
-### PDF PLOT RESULTS ###
-########################
+######################################
+### PARSE DATA INTO ORDERED ARRAYS ###
+######################################
 
-# get list of line from text1
+# get data from text1 (col #0 and col #1)
 A1, C1 = [], []
 for l in text1.split(f"\n")[5:]:
 	V = l.split("\t")
@@ -379,7 +379,7 @@ for l in text1.split(f"\n")[5:]:
 		A1.append(float(V[0]))
 		C1.append(float(V[1]))
 
-# get list of line from text2
+# get data from text2 (col #0 and col #2)
 A2, C2 = [], []
 for l in text2.split(f"\n")[5:]:
 	V = l.split("\t")
@@ -387,7 +387,7 @@ for l in text2.split(f"\n")[5:]:
 		A2.append(float(V[0]))
 		C2.append(float(V[2]))
 
-# get list of line from text3
+# get data from text3 (col #0 and col #2)
 A3, C3 = [], []
 for l in text3.split(f"\n")[5:]:
 	V = l.split("\t")
@@ -403,18 +403,23 @@ A3, C3 = array(A3), array(C3)
 
 # set angles in increasing order
 from numpy import argsort
-idx = argsort(A1)
-A1, C1 = array(A1[idx]), array(C1[idx])
-idx = argsort(A2)
-A2, C2 = array(A2[idx]), array(C2[idx])
-idx = argsort(A3)
-A3, C3 = array(A3[idx]), array(C3[idx])
+idx = argsort(A1); A1, C1 = array(A1[idx]), array(C1[idx])
+idx = argsort(A2); A2, C2 = array(A2[idx]), array(C2[idx])
+idx = argsort(A3); A3, C3 = array(A3[idx]), array(C3[idx])
 
-# e: measured dielectric constant relative to vacuum (epsilon)
-# g: measured thickness (capacitance gap)
+######################################
+### DEFINE MEASUREMENTS PARAMETERS ###
+######################################
+
+# e_: measured dielectric constant relative to vacuum (epsilon)
+# g_: measured thickness (capacitance gap)
 e1, g1 = 1.818,  40E-6
 e2, g2 = 1.87, 	100E-6
 e3, g3 = 1.87,  210E-6
+
+####################
+### PLOT RESULTS ###
+####################
 
 fg, ax = selectfigure("capa-vs-angle")
 
@@ -434,22 +439,11 @@ ax.plot(A3, capacitance(A3, g3),
 ax.set_xlabel("angle [degrees]")
 ax.set_ylabel("Capacitance [pF]")
 
-# add vertical and horizontal guide lines
-# ax.vlines(  [list(array([-12, -6, 0, +6, +12]))],
-#             -10, 110, "b", "dashed", linewidth = 0.50)
-# ax.vlines(  [list(array([-15, +15]))],
-#             -10, 110, "r", "dashed", linewidth = 0.50)
+ax.grid("True")
 
-# modify ticks
-# from numpy import linspace
-# ax.set_xticks(linspace(-24, 48, 1+(48+24)//12))
-# ax.set_xticks(linspace(-24, 48, 1+(48+24)//6), minor = True)
-# ax.set_yticks(linspace(-20, 120, 1+(120+20)//10))
-# ax.set_yticks(linspace(-20, 120, 1+(120+20)//5), minor = True)
-
-# show grid on both axes
-# ax.grid("True", axis = "y", which = "both")
-ax.grid("True", axis = "both", which = "both")
+###################
+### EXPORT PLOT ###
+###################
 
 # export figure to pdf document
 doc = Document("../result.pdf") # file path + name

@@ -1,4 +1,0 @@
-
-
-from numpy import linspace
-
