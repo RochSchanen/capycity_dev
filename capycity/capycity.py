@@ -623,15 +623,13 @@ class _map():
         overshoot the Jacobi step and maybe converge
         substantially faster. """
 
-        """
-        Also, the algorithm of Gauss-Seidel could be
+        """ Also, the algorithm of Gauss-Seidel could be
         implemented instead (explicit loop). However,
         this requires an implementation in cpython or
         some pre-compilation with optimisation.
         """        
         
-        """
-        Another thing. It may be worth investigate the
+        """ Another thing. It may be worth investigate the
         use of the graphic card ability of processing
         these operations very fast: like operation on
         images. All the computation are linear and most
